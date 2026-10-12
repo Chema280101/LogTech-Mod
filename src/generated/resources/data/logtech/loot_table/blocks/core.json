@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ],
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "functions": [
+            {
+              "function": "minecraft:copy_components",
+              "include": [
+                "logtech:storage_content"
+              ],
+              "source": "block_entity"
+            }
+          ],
+          "name": "logtech:core"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "logtech:blocks/core"
+}

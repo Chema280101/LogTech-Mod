@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "N": {
+      "item": "logtech:neoferrite_ingot"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "pattern": [
+    "NRN"
+  ],
+  "result": {
+    "count": 16,
+    "id": "logtech:backbone"
+  }
+}

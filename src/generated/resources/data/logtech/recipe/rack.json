@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "N": {
+      "item": "logtech:neoferrite_ingot"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "pattern": [
+    "INI",
+    "IRI",
+    "INI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "logtech:rack"
+  }
+}

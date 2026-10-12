@@ -1,0 +1,10 @@
+{
+  "values": [
+    "logtech:core",
+    "logtech:backbone",
+    "logtech:rack",
+    "logtech:terminal",
+    "logtech:crusher",
+    "logtech:drill"
+  ]
+}

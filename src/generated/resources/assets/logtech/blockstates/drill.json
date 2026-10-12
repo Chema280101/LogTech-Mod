@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "active=false": {
+      "model": "logtech:block/drill"
+    },
+    "active=true": {
+      "model": "logtech:block/drill_active"
+    }
+  }
+}

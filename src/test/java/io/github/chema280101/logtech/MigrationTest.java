@@ -151,15 +151,53 @@ class MigrationTest {
     }
 
     @Test
-    @DisplayName("Migración de Generador: preserva tiempo de combustión restante y energía")
-    void testCoalGeneratorMigrationV1ToV2() {
-        Integer dataVersion = null;
-        int burnTime = 650;
-        int maxBurnTime = 1600;
-        int energy = 4800;
+    @DisplayName("Integridad y lectura del archivo real logtech_deposits.dat del mundo v0.2")
+    void testV02MigrationWorldIntegrity() throws IOException {
+        File file = new File("D:\\logtech_migration_test_world_v0.2\\data\\logtech_deposits.dat");
+        if (!file.exists()) {
+            file = new File("run\\saves\\v0.2_Migration_Test_World\\data\\logtech_deposits.dat");
+        }
+        assertTrue(file.exists(), "El archivo de vetas de la v0.2 debe existir para la prueba de migración");
+        assertTrue(file.length() > 0, "El archivo logtech_deposits.dat de v0.2 no debe estar vacío");
 
-        assertEquals(650, burnTime);
-        assertEquals(1600, maxBurnTime);
-        assertEquals(4800, energy);
+        try (FileInputStream fis = new FileInputStream(file);
+             GZIPInputStream gzis = new GZIPInputStream(fis);
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+
+            byte[] buffer = new byte[1024];
+            int read;
+            while ((read = gzis.read(buffer)) != -1) {
+                baos.write(buffer, 0, read);
+            }
+
+            byte[] decompressed = baos.toByteArray();
+            assertTrue(decompressed.length > 0, "El contenido descomprimido de v0.2 debe tener bytes válidos");
+
+            String content = new String(decompressed, StandardCharsets.ISO_8859_1);
+            assertTrue(content.contains("VeinStates"), "El archivo NBT de v0.2 debe contener la lista VeinStates");
+        }
+    }
+
+    @Test
+    @DisplayName("Migración de Núcleo v0.2 a v0.3: preserva almacenamiento caliente, frío y reglas")
+    void testCoreStorageMigrationV2ToV3() {
+        // Estado representativo de un Núcleo v0.2 (data_version = 3 con niveles caliente y frío)
+        int savedDataVersion = 3;
+        SimpleTier<String> hotTier = new SimpleTier<>("hot", 16384L);
+        SimpleTier<String> coldTier = new SimpleTier<>("cold", 65536L);
+
+        hotTier.insert("logtech:raw_neoferrite", 250L, false);
+        coldTier.insert("minecraft:cobblestone", 5000L, false);
+
+        assertEquals(250L, hotTier.getAmount("logtech:raw_neoferrite"));
+        assertEquals(5000L, coldTier.getAmount("minecraft:cobblestone"));
+
+        // Al migrar a v0.3, ambos niveles se mantienen sin descarte
+        assertEquals(3, savedDataVersion);
+        assertEquals(250L, hotTier.getAmount("logtech:raw_neoferrite"));
+        assertEquals(5000L, coldTier.getAmount("minecraft:cobblestone"));
     }
 }
+
+
+

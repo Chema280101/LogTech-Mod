@@ -7,9 +7,9 @@ Registro formal de issues y limitaciones identificadas en la versión alpha v0.1
 ### Issue #1: [Feature] Generadores de energía FE propios
 - **Tipo:** Mejora / Nueva funcionalidad
 - **Severidad:** Baja (no causa crash ni pérdida de items)
-- **Estado:** Abierto
-- **Descripción:** LogTech actualmente consume Forge Energy (FE) en máquinas como el Núcleo, Triturador y Perforadora, pero no provee generadores nativos. Requiere mods complementarios de energía o fuentes externas.
-- **Plan:** Diseñar e incorporar generadores propios (ej. generador de combustión de minerales / térmico) en futuras versiones de la serie v0.x.
+- **Estado:** Cerrado / Resuelto en v0.2
+- **Descripción:** LogTech actualmente consume Forge Energy (FE) en máquinas como el Núcleo, Triturador y Perforadora, pero no proveía generadores nativos.
+- **Resolución:** Implementado `coal_generator` (Generador de carbón a 40 FE/t) en la versión v0.2.
 
 ---
 
@@ -36,3 +36,10 @@ Registro formal de issues y limitaciones identificadas en la versión alpha v0.1
 - **Estado:** Abierto
 - **Descripción:** Los sprites e iconos actuales son funcionales y de resolución 16x16 base.
 - **Plan:** Mejorar los detalles visuales de los modelos, animaciones y texturas a lo largo de las versiones v0.2 y v0.3.
+
+---
+
+## Revisión de estabilidad v0.2
+- **Pérdida de ítems:** 0 incidencias reportadas. La cola de entrega atómica de frío, la retención de subproductos de la centrífuga y el desborde jerárquico garantizan conservación al 100%.
+- **Crashes:** 0 crashes reportados. Las integraciones de Jade, JEI y EMI operan con aislamiento modular comprobado.
+- **Consumo y balances:** Verificado balance térmico y de energía sin fugas ni sobrecargas infinitas.

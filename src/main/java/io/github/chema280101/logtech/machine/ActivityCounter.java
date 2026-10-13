@@ -53,6 +53,24 @@ public class ActivityCounter {
     }
 
     /**
+     * Registra energía en FE consumida por la máquina en el minuto actual.
+     */
+    public void recordEnergyConsumed(int amount) {
+        if (amount > 0) {
+            this.buckets[this.currentIndex].addEnergyConsumed(amount);
+        }
+    }
+
+    /**
+     * Registra energía en FE recibida por el componente en el minuto actual.
+     */
+    public void recordEnergyReceived(int amount) {
+        if (amount > 0) {
+            this.buckets[this.currentIndex].addEnergyReceived(amount);
+        }
+    }
+
+    /**
      * Avanza un tick registrando si la máquina estuvo activa o inactiva.
      * Si se alcanzan 1 200 ticks, avanza automáticamente al siguiente cubo del búfer circular.
      */
@@ -175,6 +193,8 @@ public class ActivityCounter {
         int totalOut = 0;
         int totalActive = 0;
         int totalInactive = 0;
+        int totalEnergyConsumed = 0;
+        int totalEnergyReceived = 0;
 
         for (int i = 0; i < count; i++) {
             int index = (baseIndex - i + BUFFER_SIZE) % BUFFER_SIZE;
@@ -183,9 +203,11 @@ public class ActivityCounter {
             totalOut += bucket.getItemsOut();
             totalActive += bucket.getActiveTicks();
             totalInactive += bucket.getInactiveTicks();
+            totalEnergyConsumed += bucket.getEnergyConsumed();
+            totalEnergyReceived += bucket.getEnergyReceived();
         }
 
-        return new ActivitySummary(totalIn, totalOut, totalActive, totalInactive);
+        return new ActivitySummary(totalIn, totalOut, totalActive, totalInactive, totalEnergyConsumed, totalEnergyReceived);
     }
 
     /**
@@ -201,6 +223,8 @@ public class ActivityCounter {
         int totalOut = 0;
         int totalActive = 0;
         int totalInactive = 0;
+        int totalEnergyConsumed = 0;
+        int totalEnergyReceived = 0;
 
         for (int i = 1; i <= count; i++) {
             int index = (baseIndex - i + BUFFER_SIZE) % BUFFER_SIZE;
@@ -209,9 +233,11 @@ public class ActivityCounter {
             totalOut += bucket.getItemsOut();
             totalActive += bucket.getActiveTicks();
             totalInactive += bucket.getInactiveTicks();
+            totalEnergyConsumed += bucket.getEnergyConsumed();
+            totalEnergyReceived += bucket.getEnergyReceived();
         }
 
-        return new ActivitySummary(totalIn, totalOut, totalActive, totalInactive);
+        return new ActivitySummary(totalIn, totalOut, totalActive, totalInactive, totalEnergyConsumed, totalEnergyReceived);
     }
 
     public int getItemsIn(int minutes) {
@@ -230,6 +256,14 @@ public class ActivityCounter {
         return getSummary(minutes).inactiveTicks();
     }
 
+    public int getEnergyConsumed(int minutes) {
+        return getSummary(minutes).energyConsumed();
+    }
+
+    public int getEnergyReceived(int minutes) {
+        return getSummary(minutes).energyReceived();
+    }
+
     public int getCurrentTickInMinute() {
         return this.currentTickInMinute;
     }
@@ -246,6 +280,8 @@ public class ActivityCounter {
         private int itemsOut;
         private int activeTicks;
         private int inactiveTicks;
+        private int energyConsumed;
+        private int energyReceived;
 
         public MinuteBucket() {
             reset();
@@ -256,10 +292,13 @@ public class ActivityCounter {
             this.itemsOut = 0;
             this.activeTicks = 0;
             this.inactiveTicks = 0;
+            this.energyConsumed = 0;
+            this.energyReceived = 0;
         }
 
         public boolean hasActivity() {
-            return this.itemsIn > 0 || this.itemsOut > 0 || this.activeTicks > 0 || this.inactiveTicks > 0;
+            return this.itemsIn > 0 || this.itemsOut > 0 || this.activeTicks > 0 || this.inactiveTicks > 0
+                    || this.energyConsumed > 0 || this.energyReceived > 0;
         }
 
         public void addItemsIn(int count) {
@@ -278,6 +317,14 @@ public class ActivityCounter {
             this.inactiveTicks += ticks;
         }
 
+        public void addEnergyConsumed(int amount) {
+            this.energyConsumed += amount;
+        }
+
+        public void addEnergyReceived(int amount) {
+            this.energyReceived += amount;
+        }
+
         public int getItemsIn() {
             return this.itemsIn;
         }
@@ -293,13 +340,25 @@ public class ActivityCounter {
         public int getInactiveTicks() {
             return this.inactiveTicks;
         }
+
+        public int getEnergyConsumed() {
+            return this.energyConsumed;
+        }
+
+        public int getEnergyReceived() {
+            return this.energyReceived;
+        }
     }
 
     /**
      * Resumen inmutable del total de actividad calculado.
      */
-    public record ActivitySummary(int itemsIn, int itemsOut, int activeTicks, int inactiveTicks) {
-        public static final ActivitySummary EMPTY = new ActivitySummary(0, 0, 0, 0);
+    public record ActivitySummary(int itemsIn, int itemsOut, int activeTicks, int inactiveTicks, int energyConsumed, int energyReceived) {
+        public static final ActivitySummary EMPTY = new ActivitySummary(0, 0, 0, 0, 0, 0);
+
+        public ActivitySummary(int itemsIn, int itemsOut, int activeTicks, int inactiveTicks) {
+            this(itemsIn, itemsOut, activeTicks, inactiveTicks, 0, 0);
+        }
 
         public int totalTicks() {
             return activeTicks + inactiveTicks;

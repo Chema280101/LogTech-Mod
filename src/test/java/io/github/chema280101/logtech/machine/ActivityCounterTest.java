@@ -241,4 +241,37 @@ class ActivityCounterTest {
         // Minutos anteriores sin actividad -> 0
         assertEquals(0, hourlyHistory[0]);
     }
+
+    @Test
+    @DisplayName("Telemetría de energía: registro de FE consumida y recibida por minuto y en cubos históricos")
+    void testEnergyTracking() {
+        ActivityCounter counter = new ActivityCounter();
+
+        // Minuto 1: 10,000 FE recibida, 2,400 FE consumida
+        counter.recordEnergyReceived(10_000);
+        counter.recordEnergyConsumed(2_400);
+        counter.advanceTicks(1200, true);
+
+        // Minuto 2: 5,000 FE recibida, 4,000 FE consumida
+        counter.recordEnergyReceived(5_000);
+        counter.recordEnergyConsumed(4_000);
+        counter.advanceTicks(1200, true);
+
+        // Último minuto completado (minuto 2)
+        assertEquals(4_000, counter.getEnergyConsumed(1));
+        assertEquals(5_000, counter.getEnergyReceived(1));
+
+        // Últimos 2 minutos combinados
+        assertEquals(6_400, counter.getEnergyConsumed(2));
+        assertEquals(15_000, counter.getEnergyReceived(2));
+
+        // Cubos individuales
+        ActivityCounter.MinuteBucket latest = counter.getBucket(0);
+        assertEquals(4_000, latest.getEnergyConsumed());
+        assertEquals(5_000, latest.getEnergyReceived());
+
+        ActivityCounter.MinuteBucket prev = counter.getBucket(1);
+        assertEquals(2_400, prev.getEnergyConsumed());
+        assertEquals(10_000, prev.getEnergyReceived());
+    }
 }

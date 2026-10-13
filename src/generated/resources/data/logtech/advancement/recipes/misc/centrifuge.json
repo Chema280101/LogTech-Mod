@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_neoferrite_ingot": {
+      "conditions": {
+        "items": [
+          {
+            "items": "logtech:neoferrite_ingot"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "logtech:centrifuge"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_neoferrite_ingot"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "logtech:centrifuge"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "type": "logtech:crushing",
+  "energy": 4000,
+  "ingredient": {
+    "item": "logtech:raw_neoferrite"
+  },
+  "outputs": [
+    {
+      "count": 2,
+      "item": "logtech:neoferrite_dust"
+    }
+  ],
+  "ticks": 100
+}

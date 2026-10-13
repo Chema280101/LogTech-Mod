@@ -36,6 +36,9 @@ public record TerminalSyncPayload(
                 for (TerminalItemEntry entry : payload.items()) {
                     ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, entry.stack());
                     buf.writeVarLong(entry.amount());
+                    buf.writeVarLong(entry.hotAmount());
+                    buf.writeVarLong(entry.coldAmount());
+                    buf.writeEnum(entry.pinMode());
                 }
             },
             buf -> {
@@ -49,7 +52,11 @@ public record TerminalSyncPayload(
                 for (int i = 0; i < size; i++) {
                     ItemStack stack = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
                     long amount = buf.readVarLong();
-                    items.add(new TerminalItemEntry(stack, amount));
+                    long hotAmount = buf.readVarLong();
+                    long coldAmount = buf.readVarLong();
+                    io.github.chema280101.logtech.storage.ItemPinMode pinMode =
+                            buf.readEnum(io.github.chema280101.logtech.storage.ItemPinMode.class);
+                    items.add(new TerminalItemEntry(stack, amount, hotAmount, coldAmount, pinMode));
                 }
                 return new TerminalSyncPayload(containerId, networkValid, powered, batchIndex, totalBatches, items);
             }

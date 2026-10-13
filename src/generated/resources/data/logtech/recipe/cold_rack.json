@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "logtech:data_crystal"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "R": {
+      "item": "logtech:rack"
+    }
+  },
+  "pattern": [
+    "ICI",
+    "CRC",
+    "ICI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "logtech:cold_rack"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "type": "logtech:washing",
+  "energy": 4800,
+  "fluid_amount": 250,
+  "ingredient": {
+    "item": "logtech:neoferrite_dust"
+  },
+  "outputs": [
+    {
+      "item": "logtech:neoferrite_dust"
+    },
+    {
+      "item": "logtech:sludge"
+    }
+  ],
+  "purity_mode": "increase",
+  "ticks": 80
+}

@@ -3,7 +3,15 @@ package io.github.chema280101.logtech.storage;
 import java.util.Locale;
 import net.minecraft.world.item.ItemStack;
 
-public record TerminalItemEntry(ItemStack stack, long amount) {
+public record TerminalItemEntry(ItemStack stack, long amount, long hotAmount, long coldAmount, ItemPinMode pinMode) {
+
+    public TerminalItemEntry(ItemStack stack, long amount, long hotAmount, long coldAmount) {
+        this(stack, amount, hotAmount, coldAmount, ItemPinMode.AUTO);
+    }
+
+    public TerminalItemEntry(ItemStack stack, long amount) {
+        this(stack, amount, amount, 0L, ItemPinMode.AUTO);
+    }
 
     /**
      * Formatea una cantidad abreviada para mostrar en la interfaz (por ejemplo 12.3K, 1.5M).

@@ -14,6 +14,8 @@ public class ModItemModelProvider extends ItemModelProvider {
     @Override
     protected void registerModels() {
         basicItem(ModItems.DATA_MODULE.get());
+        basicItem(ModItems.DATA_MODULE_ADVANCED.get());
+        basicItem(ModItems.DATA_MODULE_MASTER.get());
         basicItem(ModItems.RAW_NEOFERRITE.get());
         basicItem(ModItems.NEOFERRITE_DUST.get());
         basicItem(ModItems.NEOFERRITE_INGOT.get());
@@ -21,5 +23,8 @@ public class ModItemModelProvider extends ItemModelProvider {
         basicItem(ModItems.CRYSTALITE_DUST.get());
         basicItem(ModItems.DATA_CRYSTAL.get());
         basicItem(ModItems.SCANNER.get());
+        basicItem(ModItems.SLAG.get());
+        basicItem(ModItems.CRYSTAL_SHARD.get());
+        basicItem(ModItems.SLUDGE.get());
     }
 }

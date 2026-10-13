@@ -18,4 +18,46 @@ public interface NetworkMember {
     default Component getMachineName() {
         return getName();
     }
+
+    default net.minecraft.core.BlockPos getBlockPos() {
+        return net.minecraft.core.BlockPos.ZERO;
+    }
+
+    /**
+     * Devuelve la cantidad de energía en FE que la máquina solicita a la red para su búfer interno.
+     * Por defecto 0 (máquinas sin consumo o productoras).
+     */
+    default int requestedEnergy() {
+        return 0;
+    }
+
+    /**
+     * Recibe energía empujada por la red hacia el búfer interno de la máquina.
+     *
+     * @param amount cantidad de FE ofrecida por la red
+     * @return cantidad de FE efectivamente aceptada
+     */
+    default int receiveNetworkEnergy(int amount) {
+        return 0;
+    }
+
+    /**
+     * Prioridad de energía de la máquina en la red (ALTA, NORMAL, BAJA).
+     */
+    default EnergyPriority getEnergyPriority() {
+        return EnergyPriority.NORMAL;
+    }
+
+    default void setEnergyPriority(EnergyPriority priority) {
+    }
+
+    /**
+     * Indica si la máquina fue apagada/despriorizada en el último ciclo por falta de energía.
+     */
+    default boolean isEnergyShed() {
+        return false;
+    }
+
+    default void setEnergyShed(boolean shed) {
+    }
 }

@@ -3,8 +3,13 @@
     "logtech:core",
     "logtech:backbone",
     "logtech:rack",
+    "logtech:cold_rack",
     "logtech:terminal",
     "logtech:crusher",
-    "logtech:drill"
+    "logtech:drill",
+    "logtech:alarm",
+    "logtech:coal_generator",
+    "logtech:centrifuge",
+    "logtech:washer"
   ]
 }

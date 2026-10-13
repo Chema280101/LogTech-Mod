@@ -9,7 +9,9 @@ public enum MachineStatus {
     NO_INPUT,
     OUTPUT_FULL,
     NO_RESOURCE,
-    IDLE;
+    NO_FLUID,
+    IDLE,
+    SHED;
 
     public String getStatusKey() {
         return "gui.logtech.machine_status." + this.name().toLowerCase(Locale.ROOT);

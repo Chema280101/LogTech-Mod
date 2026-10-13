@@ -1,0 +1,14 @@
+{
+  "type": "logtech:crushing",
+  "energy": 4000,
+  "ingredient": {
+    "item": "logtech:raw_crystalite"
+  },
+  "outputs": [
+    {
+      "count": 2,
+      "item": "logtech:crystalite_dust"
+    }
+  ],
+  "ticks": 100
+}

@@ -20,14 +20,27 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 public class RackBlock extends Block implements EntityBlock {
+    private final io.github.chema280101.logtech.storage.StorageTier tier;
+
     public RackBlock(Properties properties) {
+        this(io.github.chema280101.logtech.storage.StorageTier.HOT, properties);
+    }
+
+    public RackBlock(io.github.chema280101.logtech.storage.StorageTier tier, Properties properties) {
         super(properties);
+        this.tier = tier != null ? tier : io.github.chema280101.logtech.storage.StorageTier.HOT;
+    }
+
+    public io.github.chema280101.logtech.storage.StorageTier getTier() {
+        return this.tier;
     }
 
     @Nullable
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return new RackBlockEntity(pos, state);
+        return this.tier == io.github.chema280101.logtech.storage.StorageTier.COLD
+                ? new ColdRackBlockEntity(pos, state)
+                : new RackBlockEntity(pos, state);
     }
 
     @Override
@@ -40,20 +53,22 @@ public class RackBlock extends Block implements EntityBlock {
             InteractionHand hand,
             BlockHitResult hitResult
     ) {
-        if (stack.is(ModItems.DATA_MODULE.get())) {
+        if (RackBlockEntity.isDataModule(stack)) {
             if (level.isClientSide) {
                 return ItemInteractionResult.SUCCESS;
             }
 
             BlockEntity be = level.getBlockEntity(pos);
             if (be instanceof RackBlockEntity rackBe) {
+                String prefix = rackBe.getTier() == io.github.chema280101.logtech.storage.StorageTier.COLD
+                        ? "chat.logtech.cold_rack." : "chat.logtech.rack.";
                 if (rackBe.getModuleCount() < RackBlockEntity.SLOTS) {
                     if (rackBe.insertModule(stack)) {
                         stack.shrink(1);
                         level.playSound(null, pos, SoundEvents.ITEM_FRAME_ADD_ITEM, SoundSource.BLOCKS, 1.0F, 1.0F);
                         player.displayClientMessage(
                                 Component.translatable(
-                                        "chat.logtech.rack.inserted",
+                                        prefix + "inserted",
                                         rackBe.getModuleCount(),
                                         RackBlockEntity.SLOTS,
                                         rackBe.getCapacity()
@@ -65,7 +80,7 @@ public class RackBlock extends Block implements EntityBlock {
                 } else {
                     player.displayClientMessage(
                             Component.translatable(
-                                    "chat.logtech.rack.full",
+                                    prefix + "full",
                                     RackBlockEntity.SLOTS,
                                     RackBlockEntity.SLOTS
                             ),
@@ -93,6 +108,8 @@ public class RackBlock extends Block implements EntityBlock {
 
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof RackBlockEntity rackBe) {
+            String prefix = rackBe.getTier() == io.github.chema280101.logtech.storage.StorageTier.COLD
+                    ? "chat.logtech.cold_rack." : "chat.logtech.rack.";
             if (player.isShiftKeyDown()) {
                 ItemStack extracted = rackBe.extractModule();
                 if (!extracted.isEmpty()) {
@@ -102,7 +119,7 @@ public class RackBlock extends Block implements EntityBlock {
                     level.playSound(null, pos, SoundEvents.ITEM_FRAME_REMOVE_ITEM, SoundSource.BLOCKS, 1.0F, 1.0F);
                     player.displayClientMessage(
                             Component.translatable(
-                                    "chat.logtech.rack.extracted",
+                                    prefix + "extracted",
                                     rackBe.getModuleCount(),
                                     RackBlockEntity.SLOTS,
                                     rackBe.getCapacity()
@@ -111,13 +128,13 @@ public class RackBlock extends Block implements EntityBlock {
                     );
                     return InteractionResult.SUCCESS;
                 } else {
-                    player.displayClientMessage(Component.translatable("chat.logtech.rack.empty"), true);
+                    player.displayClientMessage(Component.translatable(prefix + "empty"), true);
                     return InteractionResult.FAIL;
                 }
             } else {
                 player.displayClientMessage(
                         Component.translatable(
-                                "chat.logtech.rack.status",
+                                prefix + "status",
                                 rackBe.getModuleCount(),
                                 RackBlockEntity.SLOTS,
                                 rackBe.getCapacity()

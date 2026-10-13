@@ -22,16 +22,27 @@ public class ModBlockTagsProvider extends BlockTagsProvider {
                 .add(ModBlocks.CORE.get())
                 .add(ModBlocks.BACKBONE.get())
                 .add(ModBlocks.RACK.get())
+                .add(ModBlocks.COLD_RACK.get())
                 .add(ModBlocks.TERMINAL.get())
                 .add(ModBlocks.CRUSHER.get())
-                .add(ModBlocks.DRILL.get());
+                .add(ModBlocks.DRILL.get())
+                .add(ModBlocks.ALARM.get())
+                .add(ModBlocks.COAL_GENERATOR.get())
+                .add(ModBlocks.CENTRIFUGE.get())
+                .add(ModBlocks.WASHER.get());
 
         tag(BlockTags.MINEABLE_WITH_PICKAXE)
                 .add(ModBlocks.CORE.get())
                 .add(ModBlocks.BACKBONE.get())
                 .add(ModBlocks.RACK.get())
+                .add(ModBlocks.COLD_RACK.get())
                 .add(ModBlocks.TERMINAL.get())
                 .add(ModBlocks.CRUSHER.get())
-                .add(ModBlocks.DRILL.get());
+                .add(ModBlocks.DRILL.get())
+                .add(ModBlocks.ALARM.get())
+                .add(ModBlocks.COAL_GENERATOR.get())
+                .add(ModBlocks.CENTRIFUGE.get())
+                .add(ModBlocks.WASHER.get())
+                .add(ModBlocks.SLAG_BLOCK.get());
     }
 }

@@ -13,5 +13,9 @@ public class ModClientScreens {
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenuTypes.TERMINAL.get(), TerminalScreen::new);
         event.register(ModMenuTypes.CRUSHER.get(), CrusherScreen::new);
+        event.register(ModMenuTypes.CORE.get(), CoreScreen::new);
+        event.register(ModMenuTypes.COAL_GENERATOR.get(), CoalGeneratorScreen::new);
+        event.register(ModMenuTypes.CENTRIFUGE.get(), CentrifugeScreen::new);
+        event.register(ModMenuTypes.WASHER.get(), WasherScreen::new);
     }
 }

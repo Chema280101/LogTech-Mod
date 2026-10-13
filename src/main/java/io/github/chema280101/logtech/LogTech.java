@@ -22,6 +22,8 @@ public class LogTech {
         ModDataComponents.DATA_COMPONENTS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
         io.github.chema280101.logtech.registry.ModMenuTypes.MENUS.register(modEventBus);
+        io.github.chema280101.logtech.registry.ModRecipeTypes.RECIPE_TYPES.register(modEventBus);
+        io.github.chema280101.logtech.registry.ModRecipeSerializers.RECIPE_SERIALIZERS.register(modEventBus);
 
         // Registro de configuración del servidor
         modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.SERVER, LogTechConfig.SPEC);

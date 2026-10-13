@@ -15,7 +15,8 @@
             {
               "function": "minecraft:copy_components",
               "include": [
-                "logtech:storage_content"
+                "logtech:storage_content",
+                "logtech:cold_storage_content"
               ],
               "source": "block_entity"
             }

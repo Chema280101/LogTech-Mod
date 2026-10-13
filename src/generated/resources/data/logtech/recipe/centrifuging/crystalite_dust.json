@@ -1,0 +1,18 @@
+{
+  "type": "logtech:centrifuging",
+  "energy": 9600,
+  "ingredient": {
+    "item": "logtech:crystalite_dust"
+  },
+  "outputs": [
+    {
+      "item": "logtech:crystalite_dust"
+    },
+    {
+      "chance": 0.8,
+      "item": "logtech:slag",
+      "scaling": "inverse_purity"
+    }
+  ],
+  "ticks": 120
+}

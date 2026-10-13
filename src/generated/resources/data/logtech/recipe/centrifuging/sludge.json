@@ -1,0 +1,14 @@
+{
+  "type": "logtech:centrifuging",
+  "energy": 9600,
+  "ingredient": {
+    "item": "logtech:sludge"
+  },
+  "outputs": [
+    {
+      "chance": 0.25,
+      "item": "logtech:crystal_shard"
+    }
+  ],
+  "ticks": 120
+}

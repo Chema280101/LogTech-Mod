@@ -24,6 +24,17 @@ public class ModCapabilities {
                 ModBlocks.BACKBONE.get()
         );
 
+        event.registerBlock(
+                Capabilities.EnergyStorage.BLOCK,
+                (level, pos, state, blockEntity, side) -> {
+                    if (level.isClientSide()) {
+                        return null;
+                    }
+                    return new io.github.chema280101.logtech.block.BackboneEnergyStorage(level, pos);
+                },
+                ModBlocks.BACKBONE.get()
+        );
+
         event.registerBlockEntity(
                 Capabilities.EnergyStorage.BLOCK,
                 ModBlockEntities.CRUSHER.get(),
@@ -46,6 +57,48 @@ public class ModCapabilities {
                 Capabilities.ItemHandler.BLOCK,
                 ModBlockEntities.DRILL.get(),
                 (drillBe, side) -> drillBe.getItemHandler(side)
+        );
+
+        event.registerBlockEntity(
+                Capabilities.EnergyStorage.BLOCK,
+                ModBlockEntities.COAL_GENERATOR.get(),
+                (genBe, side) -> genBe.getEnergyStorage()
+        );
+
+        event.registerBlockEntity(
+                Capabilities.ItemHandler.BLOCK,
+                ModBlockEntities.COAL_GENERATOR.get(),
+                (genBe, side) -> genBe.getItemHandler()
+        );
+
+        event.registerBlockEntity(
+                Capabilities.EnergyStorage.BLOCK,
+                ModBlockEntities.CENTRIFUGE.get(),
+                (centrifugeBe, side) -> centrifugeBe.getEnergyStorage()
+        );
+
+        event.registerBlockEntity(
+                Capabilities.ItemHandler.BLOCK,
+                ModBlockEntities.CENTRIFUGE.get(),
+                (centrifugeBe, side) -> centrifugeBe.getItemHandler(side)
+        );
+
+        event.registerBlockEntity(
+                Capabilities.EnergyStorage.BLOCK,
+                ModBlockEntities.WASHER.get(),
+                (washerBe, side) -> washerBe.getEnergyStorage()
+        );
+
+        event.registerBlockEntity(
+                Capabilities.ItemHandler.BLOCK,
+                ModBlockEntities.WASHER.get(),
+                (washerBe, side) -> washerBe.getItemHandler(side)
+        );
+
+        event.registerBlockEntity(
+                Capabilities.FluidHandler.BLOCK,
+                ModBlockEntities.WASHER.get(),
+                (washerBe, side) -> washerBe.getFluidTank()
         );
     }
 }

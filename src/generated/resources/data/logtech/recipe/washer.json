@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "B": {
+      "item": "minecraft:water_bucket"
+    },
+    "C": {
+      "item": "logtech:data_crystal"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "N": {
+      "item": "logtech:neoferrite_ingot"
+    }
+  },
+  "pattern": [
+    "INI",
+    "NBN",
+    "ICI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "logtech:washer"
+  }
+}

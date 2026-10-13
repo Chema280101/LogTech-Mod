@@ -56,6 +56,16 @@ public class DrillBlock extends Block implements EntityBlock {
 
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof DrillBlockEntity drillBe) {
+            if (player.isShiftKeyDown()) {
+                io.github.chema280101.logtech.network.EnergyPriority next = drillBe.getEnergyPriority().next();
+                drillBe.setEnergyPriority(next);
+                player.displayClientMessage(
+                        Component.translatable("chat.logtech.drill.priority_changed", Component.translatable(next.getTranslationKey())),
+                        true
+                );
+                return InteractionResult.CONSUME;
+            }
+
             player.displayClientMessage(
                     Component.translatable(
                             "chat.logtech.drill.status",

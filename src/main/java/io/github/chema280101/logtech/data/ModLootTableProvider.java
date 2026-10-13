@@ -48,6 +48,7 @@ public class ModLootTableProvider {
                                                             .apply(
                                                                     CopyComponentsFunction.copyComponents(CopyComponentsFunction.Source.BLOCK_ENTITY)
                                                                             .include(ModDataComponents.STORAGE_CONTENT.get())
+                                                                            .include(ModDataComponents.COLD_STORAGE_CONTENT.get())
                                                             )
                                             )
                             )
@@ -55,14 +56,33 @@ public class ModLootTableProvider {
             );
             this.dropSelf(ModBlocks.BACKBONE.get());
             this.dropSelf(ModBlocks.RACK.get());
+            this.dropSelf(ModBlocks.COLD_RACK.get());
             this.dropSelf(ModBlocks.TERMINAL.get());
             this.dropSelf(ModBlocks.CRUSHER.get());
             this.dropSelf(ModBlocks.DRILL.get());
+            this.dropSelf(ModBlocks.ALARM.get());
+            this.dropSelf(ModBlocks.COAL_GENERATOR.get());
+            this.dropSelf(ModBlocks.CENTRIFUGE.get());
+            this.dropSelf(ModBlocks.WASHER.get());
+            this.dropSelf(ModBlocks.SLAG_BLOCK.get());
         }
 
         @Override
         protected Iterable<Block> getKnownBlocks() {
-            return List.of(ModBlocks.CORE.get(), ModBlocks.BACKBONE.get(), ModBlocks.RACK.get(), ModBlocks.TERMINAL.get(), ModBlocks.CRUSHER.get(), ModBlocks.DRILL.get());
+            return List.of(
+                    ModBlocks.CORE.get(),
+                    ModBlocks.BACKBONE.get(),
+                    ModBlocks.RACK.get(),
+                    ModBlocks.COLD_RACK.get(),
+                    ModBlocks.TERMINAL.get(),
+                    ModBlocks.CRUSHER.get(),
+                    ModBlocks.DRILL.get(),
+                    ModBlocks.ALARM.get(),
+                    ModBlocks.COAL_GENERATOR.get(),
+                    ModBlocks.CENTRIFUGE.get(),
+                    ModBlocks.WASHER.get(),
+                    ModBlocks.SLAG_BLOCK.get()
+            );
         }
     }
 }

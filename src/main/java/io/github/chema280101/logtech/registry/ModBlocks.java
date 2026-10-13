@@ -23,10 +23,17 @@ public class ModBlocks {
             BlockBehaviour.Properties.of().destroyTime(2.0f).explosionResistance(3.0f)
     );
 
-    // Rack: servidor de almacenamiento que aloja modulos de datos
+    // Rack: servidor de almacenamiento que aloja modulos de datos (nivel caliente)
     public static final DeferredBlock<io.github.chema280101.logtech.block.RackBlock> RACK = BLOCKS.registerBlock(
             "rack",
             io.github.chema280101.logtech.block.RackBlock::new,
+            BlockBehaviour.Properties.of().destroyTime(2.5f).explosionResistance(5.0f)
+    );
+
+    // Rack frio: servidor de almacenamiento que aloja modulos de datos (nivel frio, 4x capacidad)
+    public static final DeferredBlock<io.github.chema280101.logtech.block.RackBlock> COLD_RACK = BLOCKS.registerBlock(
+            "cold_rack",
+            props -> new io.github.chema280101.logtech.block.RackBlock(io.github.chema280101.logtech.storage.StorageTier.COLD, props),
             BlockBehaviour.Properties.of().destroyTime(2.5f).explosionResistance(5.0f)
     );
 
@@ -48,6 +55,41 @@ public class ModBlocks {
     public static final DeferredBlock<io.github.chema280101.logtech.machine.DrillBlock> DRILL = BLOCKS.registerBlock(
             "drill",
             io.github.chema280101.logtech.machine.DrillBlock::new,
+            BlockBehaviour.Properties.of().destroyTime(3.0f).explosionResistance(6.0f)
+    );
+
+    // Alarma: emite señal de redstone según reglas de la red
+    public static final DeferredBlock<io.github.chema280101.logtech.block.AlarmBlock> ALARM = BLOCKS.registerBlock(
+            "alarm",
+            io.github.chema280101.logtech.block.AlarmBlock::new,
+            BlockBehaviour.Properties.of().destroyTime(2.0f).explosionResistance(3.0f)
+    );
+
+    // Generador temporal de carbon
+    public static final DeferredBlock<io.github.chema280101.logtech.machine.CoalGeneratorBlock> COAL_GENERATOR = BLOCKS.registerBlock(
+            "coal_generator",
+            io.github.chema280101.logtech.machine.CoalGeneratorBlock::new,
+            BlockBehaviour.Properties.of().destroyTime(3.0f).explosionResistance(6.0f).lightLevel(state -> state.getValue(io.github.chema280101.logtech.machine.CoalGeneratorBlock.LIT) ? 13 : 0)
+    );
+
+    // Centrífuga: máquina que separa subproductos según pureza
+    public static final DeferredBlock<io.github.chema280101.logtech.machine.CentrifugeBlock> CENTRIFUGE = BLOCKS.registerBlock(
+            "centrifuge",
+            io.github.chema280101.logtech.machine.CentrifugeBlock::new,
+            BlockBehaviour.Properties.of().destroyTime(3.0f).explosionResistance(6.0f)
+    );
+
+    // Bloque de escoria industrial (bloque decorativo obtenido de 4 escorias)
+    public static final DeferredBlock<Block> SLAG_BLOCK = BLOCKS.registerBlock(
+            "slag_block",
+            Block::new,
+            BlockBehaviour.Properties.of().destroyTime(2.0f).explosionResistance(6.0f)
+    );
+
+    // Lavadora: maquina que mejora la pureza de polvos consumiendo agua y produciendo lodo
+    public static final DeferredBlock<io.github.chema280101.logtech.machine.WasherBlock> WASHER = BLOCKS.registerBlock(
+            "washer",
+            io.github.chema280101.logtech.machine.WasherBlock::new,
             BlockBehaviour.Properties.of().destroyTime(3.0f).explosionResistance(6.0f)
     );
 }

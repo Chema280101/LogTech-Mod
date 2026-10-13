@@ -18,6 +18,9 @@ public class ModItems {
     // Item del bloque Rack
     public static final DeferredItem<BlockItem> RACK_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.RACK);
 
+    // Item del bloque Rack Frio
+    public static final DeferredItem<BlockItem> COLD_RACK_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.COLD_RACK);
+
     // Item del bloque Terminal
     public static final DeferredItem<BlockItem> TERMINAL_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.TERMINAL);
 
@@ -27,17 +30,51 @@ public class ModItems {
     // Item del bloque Perforadora
     public static final DeferredItem<BlockItem> DRILL_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.DRILL);
 
+    // Item del bloque Alarma
+    public static final DeferredItem<BlockItem> ALARM_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.ALARM);
+
+    // Item del bloque Generador de Carbon
+    public static final DeferredItem<BlockItem> COAL_GENERATOR_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.COAL_GENERATOR);
+
+    // Item del bloque Centrífuga
+    public static final DeferredItem<BlockItem> CENTRIFUGE_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.CENTRIFUGE);
+
+    // Item del bloque Lavadora
+    public static final DeferredItem<BlockItem> WASHER_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.WASHER);
+
+    // Item del bloque de Escoria
+    public static final DeferredItem<BlockItem> SLAG_BLOCK_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.SLAG_BLOCK);
+
     // Modulo de datos: aporta capacidad a los racks
     public static final DeferredItem<Item> DATA_MODULE = ITEMS.registerSimpleItem("data_module");
+    public static final DeferredItem<Item> DATA_MODULE_ADVANCED = ITEMS.registerSimpleItem("data_module_advanced");
+    public static final DeferredItem<Item> DATA_MODULE_MASTER = ITEMS.registerSimpleItem("data_module_master");
+
+    // Subproductos y materiales
+    public static final DeferredItem<Item> SLAG = ITEMS.registerSimpleItem("slag");
+    public static final DeferredItem<Item> CRYSTAL_SHARD = ITEMS.registerSimpleItem("crystal_shard");
+    public static final DeferredItem<Item> SLUDGE = ITEMS.registerSimpleItem("sludge");
 
     // Mineral A: Neoferrita
-    public static final DeferredItem<Item> RAW_NEOFERRITE = ITEMS.registerSimpleItem("raw_neoferrite");
-    public static final DeferredItem<Item> NEOFERRITE_DUST = ITEMS.registerSimpleItem("neoferrite_dust");
+    public static final DeferredItem<Item> RAW_NEOFERRITE = ITEMS.register(
+            "raw_neoferrite",
+            () -> new Item(new Item.Properties().component(ModDataComponents.PURITY.get(), 1))
+    );
+    public static final DeferredItem<Item> NEOFERRITE_DUST = ITEMS.register(
+            "neoferrite_dust",
+            () -> new Item(new Item.Properties().component(ModDataComponents.PURITY.get(), 1))
+    );
     public static final DeferredItem<Item> NEOFERRITE_INGOT = ITEMS.registerSimpleItem("neoferrite_ingot");
 
     // Mineral B: Cristalita
-    public static final DeferredItem<Item> RAW_CRYSTALITE = ITEMS.registerSimpleItem("raw_crystalite");
-    public static final DeferredItem<Item> CRYSTALITE_DUST = ITEMS.registerSimpleItem("crystalite_dust");
+    public static final DeferredItem<Item> RAW_CRYSTALITE = ITEMS.register(
+            "raw_crystalite",
+            () -> new Item(new Item.Properties().component(ModDataComponents.PURITY.get(), 1))
+    );
+    public static final DeferredItem<Item> CRYSTALITE_DUST = ITEMS.register(
+            "crystalite_dust",
+            () -> new Item(new Item.Properties().component(ModDataComponents.PURITY.get(), 1))
+    );
 
     // Cristal de datos
     public static final DeferredItem<Item> DATA_CRYSTAL = ITEMS.registerSimpleItem("data_crystal");

@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "logtech:data_crystal"
+    },
+    "M": {
+      "item": "logtech:data_module"
+    },
+    "N": {
+      "item": "logtech:neoferrite_ingot"
+    },
+    "S": {
+      "item": "logtech:crystal_shard"
+    }
+  },
+  "pattern": [
+    "SCS",
+    "SMS",
+    "SNS"
+  ],
+  "result": {
+    "count": 1,
+    "id": "logtech:data_module_advanced"
+  }
+}

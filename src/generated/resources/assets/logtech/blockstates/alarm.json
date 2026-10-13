@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "channel=1,powered=false": {
+      "model": "logtech:block/alarm"
+    },
+    "channel=1,powered=true": {
+      "model": "logtech:block/alarm_powered"
+    },
+    "channel=2,powered=false": {
+      "model": "logtech:block/alarm"
+    },
+    "channel=2,powered=true": {
+      "model": "logtech:block/alarm_powered"
+    },
+    "channel=3,powered=false": {
+      "model": "logtech:block/alarm"
+    },
+    "channel=3,powered=true": {
+      "model": "logtech:block/alarm_powered"
+    },
+    "channel=4,powered=false": {
+      "model": "logtech:block/alarm"
+    },
+    "channel=4,powered=true": {
+      "model": "logtech:block/alarm_powered"
+    }
+  }
+}

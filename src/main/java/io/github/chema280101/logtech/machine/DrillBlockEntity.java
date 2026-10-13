@@ -5,6 +5,7 @@ import io.github.chema280101.logtech.ore.DepositType;
 import io.github.chema280101.logtech.ore.DepositVein;
 import io.github.chema280101.logtech.ore.VeinGenerator;
 import io.github.chema280101.logtech.registry.ModBlockEntities;
+import io.github.chema280101.logtech.registry.ModDataComponents;
 import io.github.chema280101.logtech.registry.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -55,6 +56,9 @@ public class DrillBlockEntity extends BlockEntity implements NetworkMember {
     private int progress = 0;
     private int pushTimer = 0;
     private MachineStatus status = MachineStatus.NO_RESOURCE;
+    private io.github.chema280101.logtech.network.EnergyPriority energyPriority =
+            io.github.chema280101.logtech.network.EnergyPriority.NORMAL;
+    private boolean energyShed = false;
 
     // Sided capability para extracción de automatización externa
     private final IItemHandler outputHandler = new IItemHandler() {
@@ -105,8 +109,40 @@ public class DrillBlockEntity extends BlockEntity implements NetworkMember {
         return this.energyStorage;
     }
 
+    @Override
     public MachineStatus getStatus() {
         return this.status;
+    }
+
+    @Override
+    public int requestedEnergy() {
+        return Math.max(0, this.energyStorage.getMaxEnergyStored() - this.energyStorage.getEnergyStored());
+    }
+
+    @Override
+    public int receiveNetworkEnergy(int amount) {
+        return this.energyStorage.receiveNetworkEnergy(amount);
+    }
+
+    @Override
+    public io.github.chema280101.logtech.network.EnergyPriority getEnergyPriority() {
+        return this.energyPriority;
+    }
+
+    @Override
+    public void setEnergyPriority(io.github.chema280101.logtech.network.EnergyPriority priority) {
+        this.energyPriority = priority != null ? priority : io.github.chema280101.logtech.network.EnergyPriority.NORMAL;
+        setChanged();
+    }
+
+    @Override
+    public boolean isEnergyShed() {
+        return this.energyShed;
+    }
+
+    @Override
+    public void setEnergyShed(boolean shed) {
+        this.energyShed = shed;
     }
 
     public int getProgress() {
@@ -179,9 +215,13 @@ public class DrillBlockEntity extends BlockEntity implements NetworkMember {
         // 4. Verificar espacio en el búfer de 64 ítems
         int produceAmount = io.github.chema280101.logtech.LogTechConfig.DRILL_PRODUCTION_AMOUNT.get();
         Item rawItem = getRawItemForDeposit(targetVein.getType());
+        ItemStack producedStack = new ItemStack(rawItem, produceAmount);
+        ModDataComponents.setPurity(producedStack, targetVein.getPurity());
+
         ItemStack currentBuffer = this.bufferHandler.getStackInSlot(0);
         boolean canBufferFit = currentBuffer.isEmpty()
-                || (currentBuffer.is(rawItem) && currentBuffer.getCount() + produceAmount <= BUFFER_CAPACITY);
+                || (ItemStack.isSameItemSameComponents(currentBuffer, producedStack)
+                && currentBuffer.getCount() + produceAmount <= BUFFER_CAPACITY);
 
         if (!canBufferFit) {
             updateMachineState(level, pos, state, MachineStatus.OUTPUT_FULL, false);
@@ -192,7 +232,8 @@ public class DrillBlockEntity extends BlockEntity implements NetworkMember {
         // 5. Verificar energía
         int energyCost = io.github.chema280101.logtech.LogTechConfig.DRILL_ENERGY_CONSUMPTION.get();
         if (this.energyStorage.getEnergyStored() < energyCost) {
-            updateMachineState(level, pos, state, MachineStatus.NO_ENERGY, false);
+            MachineStatus target = this.energyShed ? MachineStatus.SHED : MachineStatus.NO_ENERGY;
+            updateMachineState(level, pos, state, target, false);
             this.activityCounter.tick(false);
             return;
         }
@@ -200,6 +241,7 @@ public class DrillBlockEntity extends BlockEntity implements NetworkMember {
         // 6. Todas las condiciones cumplidas: trabajando y consumiendo energía
         updateMachineState(level, pos, state, MachineStatus.WORKING, true);
         this.energyStorage.consume(energyCost);
+        this.activityCounter.recordEnergyConsumed(energyCost);
         this.progress++;
         this.activityCounter.tick(true);
 
@@ -222,7 +264,7 @@ public class DrillBlockEntity extends BlockEntity implements NetworkMember {
             }
 
             if (currentBuffer.isEmpty()) {
-                this.bufferHandler.setStackInSlot(0, new ItemStack(rawItem, produceAmount));
+                this.bufferHandler.setStackInSlot(0, producedStack);
             } else {
                 currentBuffer.grow(produceAmount);
             }
@@ -291,11 +333,13 @@ public class DrillBlockEntity extends BlockEntity implements NetworkMember {
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
+        tag.putInt("data_version", 2);
         tag.put("Inventory", this.bufferHandler.serializeNBT(registries));
         tag.putInt("Energy", this.energyStorage.getEnergyStored());
         tag.putInt("Progress", this.progress);
         tag.putInt("PushTimer", this.pushTimer);
         tag.putInt("Status", this.status.ordinal());
+        tag.putString("energy_priority", this.energyPriority.name());
     }
 
     @Override
@@ -314,6 +358,11 @@ public class DrillBlockEntity extends BlockEntity implements NetworkMember {
             if (ord >= 0 && ord < MachineStatus.values().length) {
                 this.status = MachineStatus.values()[ord];
             }
+        }
+        if (tag.contains("energy_priority")) {
+            this.energyPriority = io.github.chema280101.logtech.network.EnergyPriority.fromName(tag.getString("energy_priority"));
+        } else {
+            this.energyPriority = io.github.chema280101.logtech.network.EnergyPriority.NORMAL;
         }
     }
 }

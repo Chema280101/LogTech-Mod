@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "logtech:data_crystal"
+    },
+    "M": {
+      "item": "logtech:data_module_advanced"
+    },
+    "S": {
+      "item": "logtech:crystal_shard"
+    }
+  },
+  "pattern": [
+    "SCS",
+    "CMC",
+    "SCS"
+  ],
+  "result": {
+    "count": 1,
+    "id": "logtech:data_module_master"
+  }
+}

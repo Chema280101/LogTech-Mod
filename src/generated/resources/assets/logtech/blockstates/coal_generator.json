@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "lit=false": {
+      "model": "logtech:block/coal_generator"
+    },
+    "lit=true": {
+      "model": "logtech:block/coal_generator_active"
+    }
+  }
+}

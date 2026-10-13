@@ -74,7 +74,7 @@ public class NetworkManager {
             queue.add(initialPos);
             if (startState.is(ModBlocks.CORE.get())) {
                 cores.add(initialPos);
-            } else if (startState.is(ModBlocks.RACK.get())) {
+            } else if (startState.is(ModBlocks.RACK.get()) || startState.is(ModBlocks.COLD_RACK.get())) {
                 racks.add(initialPos);
             }
         }
@@ -114,7 +114,7 @@ public class NetworkManager {
                         queue.add(immutableNeighbor);
                         if (neighborState.is(ModBlocks.CORE.get())) {
                             cores.add(immutableNeighbor);
-                        } else if (neighborState.is(ModBlocks.RACK.get())) {
+                        } else if (neighborState.is(ModBlocks.RACK.get()) || neighborState.is(ModBlocks.COLD_RACK.get())) {
                             racks.add(immutableNeighbor);
                         }
                     }
@@ -134,7 +134,7 @@ public class NetworkManager {
      * Determina si el bloque en la posicion indicada es una maquina miembro de la red (hoja no conductora).
      */
     public boolean isMachine(BlockPos pos, BlockState state) {
-        if (state.is(ModBlocks.CRUSHER.get()) || state.is(ModBlocks.DRILL.get())) {
+        if (state.is(ModBlocks.CRUSHER.get()) || state.is(ModBlocks.DRILL.get()) || state.is(ModBlocks.ALARM.get()) || state.is(ModBlocks.COAL_GENERATOR.get())) {
             return true;
         }
         if (level != null && level.hasChunkAt(pos)) {

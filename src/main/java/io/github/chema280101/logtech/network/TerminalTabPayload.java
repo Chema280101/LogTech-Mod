@@ -11,9 +11,17 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Payload enviado del cliente al servidor para notificar la apertura o cierre de la pestaña de estadísticas.
+ * Payload enviado del cliente al servidor para notificar el cambio o cierre de pestaña en el Terminal.
+ * activeTab: 0 = Ítems, 1 = Estadísticas, 2 = Energía.
  */
-public record TerminalTabPayload(int containerId, boolean statsTabOpen) implements CustomPacketPayload {
+public record TerminalTabPayload(int containerId, int activeTab) implements CustomPacketPayload {
+    public static final int TAB_ITEMS = 0;
+    public static final int TAB_STATS = 1;
+    public static final int TAB_ENERGY = 2;
+
+    public TerminalTabPayload(int containerId, boolean statsTabOpen) {
+        this(containerId, statsTabOpen ? TAB_STATS : TAB_ITEMS);
+    }
 
     public static final Type<TerminalTabPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(LogTech.MOD_ID, "terminal_tab"));
@@ -21,9 +29,9 @@ public record TerminalTabPayload(int containerId, boolean statsTabOpen) implemen
     public static final StreamCodec<RegistryFriendlyByteBuf, TerminalTabPayload> STREAM_CODEC = StreamCodec.of(
             (buf, payload) -> {
                 buf.writeVarInt(payload.containerId());
-                buf.writeBoolean(payload.statsTabOpen());
+                buf.writeVarInt(payload.activeTab());
             },
-            buf -> new TerminalTabPayload(buf.readVarInt(), buf.readBoolean())
+            buf -> new TerminalTabPayload(buf.readVarInt(), buf.readVarInt())
     );
 
     @Override
@@ -37,7 +45,7 @@ public record TerminalTabPayload(int containerId, boolean statsTabOpen) implemen
             if (player instanceof ServerPlayer serverPlayer
                     && serverPlayer.containerMenu instanceof TerminalMenu menu
                     && menu.containerId == payload.containerId()) {
-                menu.handleTabChange(payload.statsTabOpen());
+                menu.handleTabChange(payload.activeTab());
             }
         });
     }

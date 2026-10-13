@@ -17,4 +17,16 @@ public class ModMenuTypes {
 
     public static final DeferredHolder<MenuType<?>, MenuType<io.github.chema280101.logtech.machine.CrusherMenu>> CRUSHER =
             MENUS.register("crusher", () -> IMenuTypeExtension.create(io.github.chema280101.logtech.machine.CrusherMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<io.github.chema280101.logtech.block.CoreMenu>> CORE =
+            MENUS.register("core", () -> IMenuTypeExtension.create(io.github.chema280101.logtech.block.CoreMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<io.github.chema280101.logtech.machine.CoalGeneratorMenu>> COAL_GENERATOR =
+            MENUS.register("coal_generator", () -> IMenuTypeExtension.create(io.github.chema280101.logtech.machine.CoalGeneratorMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<io.github.chema280101.logtech.machine.CentrifugeMenu>> CENTRIFUGE =
+            MENUS.register("centrifuge", () -> IMenuTypeExtension.create(io.github.chema280101.logtech.machine.CentrifugeMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<io.github.chema280101.logtech.machine.WasherMenu>> WASHER =
+            MENUS.register("washer", () -> IMenuTypeExtension.create(io.github.chema280101.logtech.machine.WasherMenu::new));
 }

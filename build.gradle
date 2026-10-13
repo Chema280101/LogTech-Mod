@@ -28,6 +28,14 @@ sourceSets.main.resources {
 
 repositories {
     mavenCentral()
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+    }
+    maven {
+        name = "BlameJared Maven"
+        url = "https://maven.blamejared.com/"
+    }
 }
 
 base {
@@ -139,6 +147,14 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // Jade (T37) optional integration
+    compileOnly "maven.modrinth:jade:15.10.6+neoforge"
+    localRuntime "maven.modrinth:jade:15.10.6+neoforge"
+
+    // JEI (T38) optional integration
+    compileOnly "mezz.jei:jei-1.21.1-neoforge-api:19.21.0.247"
+    localRuntime "mezz.jei:jei-1.21.1-neoforge:19.21.0.247"
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

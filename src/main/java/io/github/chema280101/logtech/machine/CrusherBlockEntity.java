@@ -1,6 +1,9 @@
 package io.github.chema280101.logtech.machine;
 
+import io.github.chema280101.logtech.machine.recipe.CrushingRecipe;
 import io.github.chema280101.logtech.registry.ModBlockEntities;
+import io.github.chema280101.logtech.registry.ModDataComponents;
+import io.github.chema280101.logtech.registry.ModRecipeTypes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -15,8 +18,11 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import io.github.chema280101.logtech.network.EnergyPriority;
 import io.github.chema280101.logtech.network.NetworkMember;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -39,7 +45,7 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
         @Override
         public boolean isItemValid(int slot, ItemStack stack) {
             if (slot == 0) {
-                return CrusherRecipes.hasRecipe(stack);
+                return hasRecipe(stack);
             }
             return false;
         }
@@ -55,8 +61,10 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
     private int progress = 0;
     private int maxProgress = 100;
     private MachineStatus status = MachineStatus.NO_INPUT;
+    private EnergyPriority energyPriority = EnergyPriority.NORMAL;
+    private boolean energyShed = false;
 
-    private CrusherRecipes.Recipe cachedRecipe = null;
+    private CrushingRecipe cachedRecipe = null;
     private Item lastInputItem = Items.AIR;
 
     private final ContainerData dataAccess = new ContainerData() {
@@ -70,6 +78,7 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
                 case 4 -> CrusherBlockEntity.this.energyStorage.getMaxEnergyStored() & 0xFFFF;
                 case 5 -> (CrusherBlockEntity.this.energyStorage.getMaxEnergyStored() >> 16) & 0xFFFF;
                 case 6 -> CrusherBlockEntity.this.status.ordinal();
+                case 7 -> CrusherBlockEntity.this.energyPriority.ordinal();
                 default -> 0;
             };
         }
@@ -84,12 +93,16 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
                         CrusherBlockEntity.this.status = MachineStatus.values()[value];
                     }
                 }
+                case 7 -> {
+                    CrusherBlockEntity.this.energyPriority = EnergyPriority.fromOrdinal(value);
+                    CrusherBlockEntity.this.setChanged();
+                }
             }
         }
 
         @Override
         public int getCount() {
-            return 7;
+            return 8;
         }
     };
 
@@ -107,7 +120,7 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
 
         @Override
         public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-            if (slot == 0 && CrusherRecipes.hasRecipe(stack)) {
+            if (slot == 0 && (CrusherBlockEntity.this.level == null || hasRecipe(stack))) {
                 return itemHandler.insertItem(0, stack, simulate);
             }
             return stack;
@@ -125,7 +138,7 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
 
         @Override
         public boolean isItemValid(int slot, ItemStack stack) {
-            return slot == 0 && CrusherRecipes.hasRecipe(stack);
+            return slot == 0 && (CrusherBlockEntity.this.level == null || hasRecipe(stack));
         }
     };
 
@@ -190,8 +203,68 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
         return this.dataAccess;
     }
 
+    @Override
     public MachineStatus getStatus() {
         return this.status;
+    }
+
+    @Override
+    public int requestedEnergy() {
+        return Math.max(0, this.energyStorage.getMaxEnergyStored() - this.energyStorage.getEnergyStored());
+    }
+
+    @Override
+    public int receiveNetworkEnergy(int amount) {
+        return this.energyStorage.receiveNetworkEnergy(amount);
+    }
+
+    @Override
+    public EnergyPriority getEnergyPriority() {
+        return this.energyPriority;
+    }
+
+    @Override
+    public void setEnergyPriority(EnergyPriority priority) {
+        this.energyPriority = priority != null ? priority : EnergyPriority.NORMAL;
+        setChanged();
+    }
+
+    @Override
+    public boolean isEnergyShed() {
+        return this.energyShed;
+    }
+
+    @Override
+    public void setEnergyShed(boolean shed) {
+        this.energyShed = shed;
+    }
+
+    public int getProgress() {
+        return this.progress;
+    }
+
+    public int getMaxProgress() {
+        return this.maxProgress;
+    }
+
+    public boolean hasRecipe(ItemStack stack) {
+        if (stack.isEmpty() || this.level == null) {
+            return false;
+        }
+        if (this.cachedRecipe != null && stack.is(this.lastInputItem)) {
+            return true;
+        }
+        return findRecipe(stack) != null;
+    }
+
+    private CrushingRecipe findRecipe(ItemStack stack) {
+        if (stack.isEmpty() || this.level == null) {
+            return null;
+        }
+        return this.level.getRecipeManager()
+                .getRecipeFor(ModRecipeTypes.CRUSHING.get(), new SingleRecipeInput(stack), this.level)
+                .map(RecipeHolder::value)
+                .orElse(null);
     }
 
     private void checkRecipeChanged() {
@@ -199,10 +272,10 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
         Item currentItem = currentInput.isEmpty() ? Items.AIR : currentInput.getItem();
         if (currentItem != this.lastInputItem) {
             this.lastInputItem = currentItem;
-            this.cachedRecipe = CrusherRecipes.getRecipe(currentInput).orElse(null);
+            this.cachedRecipe = findRecipe(currentInput);
             this.progress = 0;
             if (this.cachedRecipe != null) {
-                this.maxProgress = this.cachedRecipe.processingTime();
+                this.maxProgress = this.cachedRecipe.ticks();
             }
         }
     }
@@ -227,9 +300,9 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
 
         if (this.cachedRecipe == null || this.lastInputItem != inputStack.getItem()) {
             this.lastInputItem = inputStack.getItem();
-            this.cachedRecipe = CrusherRecipes.getRecipe(inputStack).orElse(null);
+            this.cachedRecipe = findRecipe(inputStack);
             if (this.cachedRecipe != null) {
-                this.maxProgress = this.cachedRecipe.processingTime();
+                this.maxProgress = this.cachedRecipe.ticks();
             }
         }
 
@@ -244,7 +317,7 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
         }
 
         ItemStack currentOutput = this.itemHandler.getStackInSlot(1);
-        ItemStack recipeOutput = this.cachedRecipe.output();
+        ItemStack recipeOutput = this.cachedRecipe.assemble(new SingleRecipeInput(inputStack), level.registryAccess());
 
         boolean canFitOutput = currentOutput.isEmpty()
                 || (ItemStack.isSameItemSameComponents(currentOutput, recipeOutput)
@@ -259,10 +332,11 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
             return;
         }
 
-        int energyCost = io.github.chema280101.logtech.LogTechConfig.CRUSHER_ENERGY_CONSUMPTION.get();
+        int energyCost = this.cachedRecipe.getEnergyPerTick();
         if (this.energyStorage.getEnergyStored() < energyCost) {
-            if (this.status != MachineStatus.NO_ENERGY) {
-                this.status = MachineStatus.NO_ENERGY;
+            MachineStatus target = this.energyShed ? MachineStatus.SHED : MachineStatus.NO_ENERGY;
+            if (this.status != target) {
+                this.status = target;
                 setChanged();
             }
             this.activityCounter.tick(false);
@@ -276,6 +350,7 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
         }
 
         this.energyStorage.consume(energyCost);
+        this.activityCounter.recordEnergyConsumed(energyCost);
         this.progress++;
         this.activityCounter.tick(true);
 
@@ -329,11 +404,13 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
+        tag.putInt("data_version", 2);
         tag.put("Inventory", this.itemHandler.serializeNBT(registries));
         tag.putInt("Energy", this.energyStorage.getEnergyStored());
         tag.putInt("Progress", this.progress);
         tag.putInt("MaxProgress", this.maxProgress);
         tag.putInt("Status", this.status.ordinal());
+        tag.putString("energy_priority", this.energyPriority.name());
     }
 
     @Override
@@ -353,8 +430,13 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
                 this.status = MachineStatus.values()[ord];
             }
         }
+        if (tag.contains("energy_priority")) {
+            this.energyPriority = EnergyPriority.fromName(tag.getString("energy_priority"));
+        } else {
+            this.energyPriority = EnergyPriority.NORMAL;
+        }
         ItemStack input = this.itemHandler.getStackInSlot(0);
         this.lastInputItem = input.isEmpty() ? Items.AIR : input.getItem();
-        this.cachedRecipe = CrusherRecipes.getRecipe(input).orElse(null);
+        this.cachedRecipe = null;
     }
 }

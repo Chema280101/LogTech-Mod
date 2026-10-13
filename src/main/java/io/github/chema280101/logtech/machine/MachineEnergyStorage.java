@@ -19,6 +19,25 @@ public class MachineEnergyStorage extends EnergyStorage {
         return received;
     }
 
+    /**
+     * Recibe energía proveniente de la red de LogTech directamente al búfer interno,
+     * aceptando hasta la capacidad máxima disponible (sin limitarse por maxReceive de cables externos).
+     */
+    public int receiveNetworkEnergy(int toReceive) {
+        if (toReceive <= 0) {
+            return 0;
+        }
+        int space = this.capacity - this.energy;
+        int accepted = Math.min(toReceive, space);
+        if (accepted > 0) {
+            this.energy += accepted;
+            if (onChanged != null) {
+                onChanged.run();
+            }
+        }
+        return accepted;
+    }
+
     public boolean consume(int toConsume) {
         if (toConsume <= 0) {
             return true;

@@ -1,7 +1,10 @@
 package io.github.chema280101.logtech.client;
 
 import io.github.chema280101.logtech.block.TerminalMenu;
+import io.github.chema280101.logtech.network.EnergyPriority;
 import io.github.chema280101.logtech.network.TerminalActionPayload;
+import io.github.chema280101.logtech.network.TerminalEnergyPayload;
+import io.github.chema280101.logtech.network.TerminalPriorityPayload;
 import io.github.chema280101.logtech.network.TerminalStatsPayload;
 import io.github.chema280101.logtech.network.TerminalTabPayload;
 import io.github.chema280101.logtech.storage.TerminalItemEntry;
@@ -29,7 +32,8 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
 
     public enum Tab {
         ITEMS,
-        STATS
+        STATS,
+        ENERGY
     }
 
     public enum SortMode {
@@ -42,7 +46,9 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
     private Tab currentTab = Tab.ITEMS;
     private Button itemsTabButton;
     private Button statsTabButton;
+    private Button energyTabButton;
     private int machineScroll = 0;
+    private int energyMachineScroll = 0;
 
     private final List<TerminalItemEntry> filteredItems = new ArrayList<>();
     private EditBox searchBox;
@@ -61,15 +67,18 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
         super.init();
         this.menu.setOnItemsUpdatedCallback(this::onItemsUpdated);
         this.menu.setOnStatsUpdatedCallback(this::onStatsUpdated);
+        this.menu.setOnEnergyUpdatedCallback(this::onEnergyUpdated);
 
         String prevSearch = this.searchBox != null ? this.searchBox.getValue() : "";
 
-        // Botones de pestañas superiores
+        // Botones de pestañas superiores (Ítems, Estadísticas, Energía)
         int tabButtonY = this.topPos - 18;
         int itemsTabX = this.leftPos + 6;
-        int itemsTabW = 48;
+        int itemsTabW = 44;
         int statsTabX = itemsTabX + itemsTabW + 2;
-        int statsTabW = 78;
+        int statsTabW = 60;
+        int energyTabX = statsTabX + statsTabW + 2;
+        int energyTabW = 56;
 
         this.itemsTabButton = Button.builder(
                 Component.translatable("gui.logtech.terminal.tab.items"),
@@ -81,8 +90,14 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
                 btn -> selectTab(Tab.STATS)
         ).bounds(statsTabX, tabButtonY, statsTabW, 18).build();
 
+        this.energyTabButton = Button.builder(
+                Component.translatable("gui.logtech.terminal.tab.energy"),
+                btn -> selectTab(Tab.ENERGY)
+        ).bounds(energyTabX, tabButtonY, energyTabW, 18).build();
+
         this.addRenderableWidget(this.itemsTabButton);
         this.addRenderableWidget(this.statsTabButton);
+        this.addRenderableWidget(this.energyTabButton);
 
         // Controles de la pestaña Ítems
         int sortButtonWidth = 24;
@@ -140,20 +155,29 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
             return;
         }
         this.currentTab = tab;
-        boolean isStats = (tab == Tab.STATS);
-        PacketDistributor.sendToServer(new TerminalTabPayload(this.menu.containerId, isStats));
+        int activeTabId = switch (tab) {
+            case ITEMS -> TerminalTabPayload.TAB_ITEMS;
+            case STATS -> TerminalTabPayload.TAB_STATS;
+            case ENERGY -> TerminalTabPayload.TAB_ENERGY;
+        };
+        PacketDistributor.sendToServer(new TerminalTabPayload(this.menu.containerId, activeTabId));
         updateWidgetVisibility();
     }
 
     private void updateWidgetVisibility() {
         boolean isItems = (this.currentTab == Tab.ITEMS);
+        boolean isStats = (this.currentTab == Tab.STATS);
+        boolean isEnergy = (this.currentTab == Tab.ENERGY);
         boolean active = this.menu.isNetworkValid() && this.menu.isPowered();
 
         if (this.itemsTabButton != null) {
             this.itemsTabButton.active = !isItems;
         }
         if (this.statsTabButton != null) {
-            this.statsTabButton.active = isItems;
+            this.statsTabButton.active = !isStats;
+        }
+        if (this.energyTabButton != null) {
+            this.energyTabButton.active = !isEnergy;
         }
 
         if (this.searchBox != null) {
@@ -191,6 +215,10 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
 
     private void onStatsUpdated() {
         // Callback al recibir nuevas estadísticas del servidor
+    }
+
+    private void onEnergyUpdated() {
+        // Callback al recibir nueva telemetría de energía del servidor
     }
 
     private void refreshFilteredItems() {
@@ -246,8 +274,8 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
 
     @Override
     public void onClose() {
-        if (this.currentTab == Tab.STATS) {
-            PacketDistributor.sendToServer(new TerminalTabPayload(this.menu.containerId, false));
+        if (this.currentTab != Tab.ITEMS) {
+            PacketDistributor.sendToServer(new TerminalTabPayload(this.menu.containerId, TerminalTabPayload.TAB_ITEMS));
         }
         super.onClose();
     }
@@ -271,6 +299,23 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
             return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
         }
 
+        if (this.currentTab == Tab.ENERGY) {
+            TerminalEnergyPayload energy = this.menu.getClientEnergy();
+            if (energy != null) {
+                int maxMachScroll = Math.max(0, energy.machines().size() - 3);
+                if (maxMachScroll > 0) {
+                    if (scrollY > 0) {
+                        this.energyMachineScroll = Math.max(0, this.energyMachineScroll - 1);
+                        return true;
+                    } else if (scrollY < 0) {
+                        this.energyMachineScroll = Math.min(maxMachScroll, this.energyMachineScroll + 1);
+                        return true;
+                    }
+                }
+            }
+            return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        }
+
         int totalRows = (int) Math.ceil(this.filteredItems.size() / 9.0);
         int maxScroll = Math.max(0, totalRows - 6);
         if (maxScroll > 0) {
@@ -287,9 +332,11 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        Component currentTitle = (this.currentTab == Tab.STATS)
-                ? Component.translatable("gui.logtech.terminal.tab.stats")
-                : this.title;
+        Component currentTitle = switch (this.currentTab) {
+            case STATS -> Component.translatable("gui.logtech.terminal.tab.stats");
+            case ENERGY -> Component.translatable("gui.logtech.terminal.tab.energy");
+            case ITEMS -> this.title;
+        };
         guiGraphics.drawString(this.font, currentTitle, this.titleLabelX, this.titleLabelY, 0x404040, false);
         guiGraphics.drawString(this.font, this.playerInventoryTitle, this.inventoryLabelX, this.inventoryLabelY, 0x404040, false);
     }
@@ -298,10 +345,18 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
     protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
         guiGraphics.blit(CONTAINER_BACKGROUND, this.leftPos, this.topPos, 0, 0, this.imageWidth, this.imageHeight);
 
-        if (this.currentTab == Tab.STATS) {
-            // Fondo oscuro para la pestaña de estadísticas sobre el área de ranuras
+        if (this.currentTab == Tab.STATS || this.currentTab == Tab.ENERGY) {
+            // Fondo oscuro para pestañas de estadísticas y energía sobre el área de ranuras
             guiGraphics.fill(this.leftPos + 7, this.topPos + 17, this.leftPos + 169, this.topPos + 129, 0xFF141418);
             guiGraphics.renderOutline(this.leftPos + 7, this.topPos + 17, 162, 112, 0xFF2A2A36);
+        }
+    }
+
+    @Override
+    public void containerTick() {
+        super.containerTick();
+        if (this.menu.hasActiveColdRetrieval()) {
+            this.menu.clientTick();
         }
     }
 
@@ -312,8 +367,14 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
 
         if (this.currentTab == Tab.ITEMS) {
             renderItemsTab(guiGraphics, mouseX, mouseY);
-        } else {
+        } else if (this.currentTab == Tab.STATS) {
             renderStatsTab(guiGraphics, mouseX, mouseY);
+        } else {
+            renderEnergyTab(guiGraphics, mouseX, mouseY);
+        }
+
+        if (this.menu.hasActiveColdRetrieval()) {
+            renderColdRetrievalBar(guiGraphics, mouseX, mouseY);
         }
     }
 
@@ -382,6 +443,31 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
                             "gui.logtech.terminal.stored_amount",
                             String.format(Locale.ROOT, "%,d", hoveredEntry.amount())
                     ).withStyle(ChatFormatting.GRAY)
+            );
+            tooltip.add(
+                    Component.translatable(
+                            "gui.logtech.terminal.stored_hot",
+                            String.format(Locale.ROOT, "%,d", hoveredEntry.hotAmount())
+                    ).withStyle(ChatFormatting.GOLD)
+            );
+            tooltip.add(
+                    Component.translatable(
+                            "gui.logtech.terminal.stored_cold",
+                            String.format(Locale.ROOT, "%,d", hoveredEntry.coldAmount())
+                    ).withStyle(ChatFormatting.AQUA)
+            );
+            Component policyComp = switch (hoveredEntry.pinMode()) {
+                case FIJAR_CALIENTE -> Component.translatable("gui.logtech.terminal.policy.fijar_caliente").withStyle(ChatFormatting.GOLD);
+                case SOLO_FRIO -> Component.translatable("gui.logtech.terminal.policy.solo_frio").withStyle(ChatFormatting.AQUA);
+                case AUTO -> Component.translatable("gui.logtech.terminal.policy.auto").withStyle(ChatFormatting.GREEN);
+            };
+            tooltip.add(
+                    Component.translatable("gui.logtech.terminal.stored_policy", policyComp)
+                            .withStyle(ChatFormatting.GRAY)
+            );
+            tooltip.add(
+                    Component.translatable("gui.logtech.terminal.policy_hint")
+                            .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC)
             );
             guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         } else {
@@ -560,6 +646,234 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
         renderTooltip(guiGraphics, mouseX, mouseY);
     }
 
+    private void renderEnergyTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        boolean valid = this.menu.isNetworkValid();
+        boolean powered = this.menu.isPowered();
+
+        if (!valid) {
+            Component invalidComp = Component.translatable("gui.logtech.terminal.network_invalid");
+            guiGraphics.drawString(this.font, invalidComp, this.leftPos + 10, this.topPos + 22, 0xD32F2F, false);
+            renderTooltip(guiGraphics, mouseX, mouseY);
+            return;
+        }
+        if (!powered) {
+            Component noEnergyComp = Component.translatable("gui.logtech.terminal.no_energy");
+            guiGraphics.drawString(this.font, noEnergyComp, this.leftPos + 10, this.topPos + 22, 0xD32F2F, false);
+            renderTooltip(guiGraphics, mouseX, mouseY);
+            return;
+        }
+
+        TerminalEnergyPayload energy = this.menu.getClientEnergy();
+        if (energy == null) {
+            Component loadingComp = Component.translatable("gui.logtech.terminal.energy.loading");
+            guiGraphics.drawString(this.font, loadingComp, this.leftPos + 10, this.topPos + 22, 0x888888, false);
+            renderTooltip(guiGraphics, mouseX, mouseY);
+            return;
+        }
+
+        int left = this.leftPos + 10;
+
+        // 1. FE almacenada y capacidad con barra
+        int stored = energy.energyStored();
+        int cap = energy.energyCapacity();
+        double pct = cap > 0 ? (stored * 100.0 / cap) : 0.0;
+        Component energyComp = Component.translatable(
+                "gui.logtech.terminal.energy.storage",
+                String.format(Locale.ROOT, "%,d", stored),
+                String.format(Locale.ROOT, "%,d", cap),
+                String.format(Locale.ROOT, "%.1f", pct)
+        );
+        drawFittedString(guiGraphics, energyComp, left, this.topPos + 19, 154, 0xFFD54F);
+
+        int barX = left;
+        int barY = this.topPos + 28;
+        int barW = 154;
+        int barH = 5;
+        guiGraphics.fill(barX, barY, barX + barW, barY + barH, 0xFF222228);
+        guiGraphics.renderOutline(barX - 1, barY - 1, barW + 2, barH + 2, 0xFF3E3E4C);
+        int fillW = cap > 0 ? (int) Math.min(barW, Math.round((double) stored / cap * barW)) : 0;
+        int fillColor = pct < 20.0 ? 0xFFE53935 : (pct >= 90.0 ? 0xFF43A047 : 0xFFFFA000);
+        if (fillW > 0) {
+            guiGraphics.fill(barX, barY, barX + fillW, barY + barH, fillColor);
+        }
+
+        // 2. FE recibida y consumida por minuto
+        Component ratesComp = Component.translatable(
+                "gui.logtech.terminal.energy.rates",
+                String.format(Locale.ROOT, "%,d", energy.energyReceivedPerMinute()),
+                String.format(Locale.ROOT, "%,d", energy.energyConsumedPerMinute())
+        );
+        drawFittedString(guiGraphics, ratesComp, left, this.topPos + 36, 154, 0xEEEEEE);
+
+        // 3. Consumo por rama: Almacenamiento (Núcleo y Terminal) y Minerales (Triturador, Lavadora, Centrífuga y Perforadora)
+        Component branchesComp = Component.translatable(
+                "gui.logtech.terminal.energy.branches",
+                String.format(Locale.ROOT, "%,d", energy.storageBranchConsumption()),
+                String.format(Locale.ROOT, "%,d", energy.mineralsBranchConsumption())
+        );
+        drawFittedString(guiGraphics, branchesComp, left, this.topPos + 46, 154, 0x80D8FF);
+
+        // 4. Gráfica de los últimos 60 minutos (FE recibida y consumida)
+        guiGraphics.drawString(
+                this.font,
+                Component.translatable("gui.logtech.terminal.energy.chart_title"),
+                left,
+                this.topPos + 56,
+                0xAAAAAA,
+                false
+        );
+
+        int chartX = left;
+        int chartY = this.topPos + 66;
+        int chartW = 120;
+        int chartH = 18;
+        guiGraphics.fill(chartX, chartY, chartX + chartW, chartY + chartH, 0xFF18181E);
+        guiGraphics.renderOutline(chartX - 1, chartY - 1, chartW + 2, chartH + 2, 0xFF353545);
+
+        int[] recHist = energy.receivedHistory();
+        int[] conHist = energy.consumedHistory();
+        int maxVal = 1;
+        for (int v : recHist) if (v > maxVal) maxVal = v;
+        for (int v : conHist) if (v > maxVal) maxVal = v;
+
+        for (int i = 0; i < 60; i++) {
+            int rVal = (i < recHist.length) ? recHist[i] : 0;
+            int cVal = (i < conHist.length) ? conHist[i] : 0;
+            int rH = (rVal > 0) ? Math.max(1, (int) Math.round(((double) rVal / maxVal) * (chartH - 2))) : 0;
+            int cH = (cVal > 0) ? Math.max(1, (int) Math.round(((double) cVal / maxVal) * (chartH - 2))) : 0;
+            int bX = chartX + i * 2;
+
+            // Barra de entrada (recibida) en el primer pixel
+            if (rH > 0) {
+                int rY = chartY + chartH - 1 - rH;
+                guiGraphics.fill(bX, rY, bX + 1, chartY + chartH - 1, (i == 59) ? 0xFF69F0AE : 0xFF2E7D32);
+            }
+            // Barra de consumo en el segundo pixel
+            if (cH > 0) {
+                int cY = chartY + chartH - 1 - cH;
+                guiGraphics.fill(bX + 1, cY, bX + 2, chartY + chartH - 1, (i == 59) ? 0xFFFFAB40 : 0xFFE65100);
+            }
+        }
+
+        // Escala del gráfico a la derecha
+        String maxStr = maxVal >= 1000 ? (maxVal / 1000) + "k" : maxVal + "";
+        guiGraphics.drawString(this.font, maxStr, left + 124, chartY, 0x777777, false);
+        guiGraphics.drawString(this.font, "0", left + 124, chartY + 9, 0x555555, false);
+
+        // 5. Consumo por máquina, ordenado de mayor a menor, con su prioridad
+        List<TerminalEnergyPayload.MachineEnergyEntry> machines = energy.machines();
+        int machLabelY = this.topPos + 87;
+        Component machTitle = Component.translatable("gui.logtech.terminal.energy.machines_title", machines.size());
+        guiGraphics.drawString(this.font, machTitle, left, machLabelY, 0xAAAAAA, false);
+
+        if (machines.isEmpty()) {
+            guiGraphics.drawString(
+                    this.font,
+                    Component.translatable("gui.logtech.terminal.energy.no_machines"),
+                    left,
+                    machLabelY + 10,
+                    0x666666,
+                    false
+            );
+        } else {
+            int maxMachScroll = Math.max(0, machines.size() - 3);
+            if (maxMachScroll > 0) {
+                String pageStr = (this.energyMachineScroll + 1) + "-" + Math.min(this.energyMachineScroll + 3, machines.size()) + "/" + machines.size();
+                guiGraphics.drawString(
+                        this.font,
+                        pageStr,
+                        this.leftPos + this.imageWidth - 12 - this.font.width(pageStr),
+                        machLabelY,
+                        0x666666,
+                        false
+                );
+            }
+
+            for (int row = 0; row < 3; row++) {
+                int mIdx = this.energyMachineScroll + row;
+                if (mIdx >= machines.size()) break;
+                TerminalEnergyPayload.MachineEnergyEntry m = machines.get(mIdx);
+                int lineY = machLabelY + 10 + row * 10;
+
+                // Botón / badge de prioridad a la derecha
+                int pBadgeW = 24;
+                int pBadgeH = 9;
+                int pBadgeX = this.leftPos + this.imageWidth - 10 - pBadgeW;
+                int pBadgeY = lineY;
+
+                // Color del badge según prioridad
+                int badgeBg = m.isCore() ? 0xFF37474F : switch (m.priority()) {
+                    case HIGH -> 0xFF2E7D32;
+                    case NORMAL -> 0xFF0277BD;
+                    case LOW -> 0xFFC62828;
+                };
+                int badgeBorder = m.isCore() ? 0xFF546E7A : switch (m.priority()) {
+                    case HIGH -> 0xFF66BB6A;
+                    case NORMAL -> 0xFF4FC3F7;
+                    case LOW -> 0xFFEF5350;
+                };
+                guiGraphics.fill(pBadgeX, pBadgeY, pBadgeX + pBadgeW, pBadgeY + pBadgeH, badgeBg);
+                guiGraphics.renderOutline(pBadgeX, pBadgeY, pBadgeW, pBadgeH, badgeBorder);
+
+                String pLabel = m.isCore() ? "CORE" : switch (m.priority()) {
+                    case HIGH -> "ALTA";
+                    case NORMAL -> "NORM";
+                    case LOW -> "BAJA";
+                };
+                int pLabelW = this.font.width(pLabel);
+                guiGraphics.drawString(this.font, pLabel, pBadgeX + (pBadgeW - pLabelW) / 2, pBadgeY + 1, 0xFFFFFF, false);
+
+                // Nombre y consumo
+                Component textComp = Component.literal(m.name().getString() + ": -" + String.format(Locale.ROOT, "%,d", m.energyConsumed()) + " FE/m");
+                drawFittedString(guiGraphics, textComp, left, lineY + 1, pBadgeX - left - 4, 0xCCCCCC);
+            }
+        }
+
+        // Tooltip en la gráfica si el ratón está encima
+        if (mouseX >= chartX && mouseX < chartX + chartW && mouseY >= chartY && mouseY < chartY + chartH) {
+            int idx = (mouseX - chartX) / 2;
+            if (idx >= 0 && idx < 60) {
+                int rV = (idx < recHist.length) ? recHist[idx] : 0;
+                int cV = (idx < conHist.length) ? conHist[idx] : 0;
+                int minsAgo = 59 - idx;
+                String timeLabel = (minsAgo == 0)
+                        ? Component.translatable("gui.logtech.terminal.energy.current_minute").getString()
+                        : Component.translatable("gui.logtech.terminal.energy.minutes_ago", minsAgo).getString();
+                int net = rV - cV;
+                String netStr = (net >= 0 ? "+" : "") + String.format(Locale.ROOT, "%,d", net) + " FE";
+                Component tip = Component.translatable(
+                        "gui.logtech.terminal.energy.chart_tooltip",
+                        timeLabel,
+                        String.format(Locale.ROOT, "%,d", rV),
+                        String.format(Locale.ROOT, "%,d", cV),
+                        netStr
+                );
+                guiGraphics.renderTooltip(this.font, tip, mouseX, mouseY);
+                return;
+            }
+        }
+
+        // Tooltip en el badge de prioridad si el ratón está encima
+        for (int row = 0; row < 3; row++) {
+            int mIdx = this.energyMachineScroll + row;
+            if (mIdx >= machines.size()) break;
+            TerminalEnergyPayload.MachineEnergyEntry m = machines.get(mIdx);
+            int lineY = machLabelY + 10 + row * 10;
+            int pBadgeW = 24;
+            int pBadgeH = 9;
+            int pBadgeX = this.leftPos + this.imageWidth - 10 - pBadgeW;
+            if (mouseX >= pBadgeX && mouseX < pBadgeX + pBadgeW && mouseY >= lineY && mouseY < lineY + pBadgeH) {
+                Component tip = m.isCore()
+                        ? Component.translatable("gui.logtech.terminal.energy.priority_fixed_tooltip")
+                        : Component.translatable("gui.logtech.terminal.energy.priority_tooltip");
+                guiGraphics.renderTooltip(this.font, tip, mouseX, mouseY);
+                return;
+            }
+        }
+
+        renderTooltip(guiGraphics, mouseX, mouseY);
+    }
+
     private void drawFittedString(GuiGraphics guiGraphics, Component comp, int x, int y, int maxWidth, int color) {
         int strWidth = this.font.width(comp);
         if (strWidth > maxWidth && maxWidth > 0) {
@@ -582,8 +896,33 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
         if (this.statsTabButton != null && this.statsTabButton.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
+        if (this.energyTabButton != null && this.energyTabButton.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
 
         if (this.currentTab == Tab.STATS) {
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+
+        if (this.currentTab == Tab.ENERGY) {
+            TerminalEnergyPayload energy = this.menu.getClientEnergy();
+            if (energy != null && !energy.machines().isEmpty()) {
+                int machLabelY = this.topPos + 87;
+                int pBadgeW = 24;
+                int pBadgeH = 9;
+                int pBadgeX = this.leftPos + this.imageWidth - 10 - pBadgeW;
+                for (int row = 0; row < 3; row++) {
+                    int mIdx = this.energyMachineScroll + row;
+                    if (mIdx >= energy.machines().size()) break;
+                    TerminalEnergyPayload.MachineEnergyEntry m = energy.machines().get(mIdx);
+                    int lineY = machLabelY + 10 + row * 10;
+                    if (!m.isCore() && mouseX >= pBadgeX && mouseX < pBadgeX + pBadgeW && mouseY >= lineY && mouseY < lineY + pBadgeH) {
+                        EnergyPriority next = m.priority().next();
+                        PacketDistributor.sendToServer(new TerminalPriorityPayload(this.menu.containerId, m.pos(), next.ordinal()));
+                        return true;
+                    }
+                }
+            }
             return super.mouseClicked(mouseX, mouseY, button);
         }
 
@@ -643,7 +982,15 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
                 List<TerminalItemEntry> items = this.filteredItems;
                 if (index >= 0 && index < items.size()) {
                     TerminalItemEntry entry = items.get(index);
-                    if (hasShiftDown()) {
+                    if (hasControlDown() && button == 1) {
+                        PacketDistributor.sendToServer(new TerminalActionPayload(
+                                this.menu.containerId,
+                                TerminalActionPayload.ActionType.CYCLE_PIN_POLICY,
+                                0,
+                                entry.stack()
+                        ));
+                        return true;
+                    } else if (hasShiftDown()) {
                         PacketDistributor.sendToServer(new TerminalActionPayload(
                                 this.menu.containerId,
                                 TerminalActionPayload.ActionType.EXTRACT_SHIFT,
@@ -706,7 +1053,7 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
 
     @Override
     protected void slotClicked(Slot slot, int slotId, int mouseButton, ClickType type) {
-        if (this.currentTab == Tab.STATS && type == ClickType.QUICK_MOVE) {
+        if ((this.currentTab == Tab.STATS || this.currentTab == Tab.ENERGY) && type == ClickType.QUICK_MOVE) {
             return;
         }
         if (type == ClickType.QUICK_MOVE && slot != null) {
@@ -740,5 +1087,74 @@ public class TerminalScreen extends AbstractContainerScreen<TerminalMenu> {
             guiGraphics.drawString(this.font, text, (int) posX, (int) posY, 0xFFFFFF, true);
         }
         guiGraphics.pose().popPose();
+    }
+
+    private void renderColdRetrievalBar(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        ItemStack item = this.menu.getClientColdItem();
+        if (item.isEmpty()) {
+            return;
+        }
+        int amount = this.menu.getClientColdAmount();
+        int remTicks = this.menu.getClientColdRemainingTicks();
+        int totTicks = Math.max(1, this.menu.getClientColdTotalTicks());
+        int queueSize = this.menu.getClientColdQueueSize();
+
+        int barW = 162;
+        int barH = 20;
+        int barX = this.leftPos + 7;
+        int barY = (this.topPos + this.imageHeight + barH + 2 <= this.height)
+                ? this.topPos + this.imageHeight + 2
+                : this.topPos - barH - 2;
+
+        // Fondo oscuro y contorno cyan/hielo
+        guiGraphics.fill(barX, barY, barX + barW, barY + barH, 0xEE101622);
+        guiGraphics.renderOutline(barX, barY, barW, barH, 0xFF0288D1);
+
+        // Icono del ítem
+        guiGraphics.renderItem(item, barX + 2, barY + 2);
+
+        // Cantidad
+        String amountStr = "x" + amount;
+        if (queueSize > 1) {
+            amountStr += " (+" + (queueSize - 1) + ")";
+        }
+        guiGraphics.drawString(this.font, amountStr, barX + 21, barY + 6, 0xFFFFFF, false);
+
+        // Barra de progreso y cuenta atrás
+        float seconds = Math.max(0.0f, remTicks / 20.0f);
+        String timeStr = String.format(Locale.ROOT, "%.1fs", seconds);
+        int timeWidth = this.font.width(timeStr);
+        int countdownX = barX + barW - timeWidth - 4;
+
+        int textWidth = this.font.width(amountStr);
+        int progX = barX + 23 + textWidth + 4;
+        int progW = countdownX - progX - 4;
+
+        if (progW > 15) {
+            int progY = barY + 6;
+            int progH = 8;
+            guiGraphics.fill(progX, progY, progX + progW, progY + progH, 0xFF0A0F18);
+            guiGraphics.renderOutline(progX, progY, progW, progH, 0xFF1E2D3D);
+
+            float progress = Math.min(1.0f, Math.max(0.0f, (float) (totTicks - remTicks) / totTicks));
+            int fillW = (int) Math.round(progress * (progW - 2));
+            if (fillW > 0) {
+                guiGraphics.fillGradient(progX + 1, progY + 1, progX + 1 + fillW, progY + progH - 1, 0xFF00B0FF, 0xFF00E5FF);
+            }
+        }
+
+        guiGraphics.drawString(this.font, timeStr, countdownX, barY + 6, 0x80D8FF, false);
+
+        // Tooltip explicativo
+        if (mouseX >= barX && mouseX < barX + barW && mouseY >= barY && mouseY < barY + barH) {
+            Component name = item.getHoverName();
+            Component tooltip = Component.translatable(
+                    "gui.logtech.terminal.cold_retrieval_tooltip",
+                    name,
+                    amount,
+                    String.format(Locale.ROOT, "%.1f", seconds)
+            );
+            guiGraphics.renderTooltip(this.font, tooltip, mouseX, mouseY);
+        }
     }
 }

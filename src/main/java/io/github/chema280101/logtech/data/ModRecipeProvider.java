@@ -14,7 +14,10 @@ import io.github.chema280101.logtech.LogTech;
 import net.minecraft.resources.ResourceLocation;
 
 import io.github.chema280101.logtech.registry.ModBlocks;
+import io.github.chema280101.logtech.machine.recipe.OutputScaling;
+import io.github.chema280101.logtech.machine.recipe.PurityMode;
 import net.minecraft.data.recipes.ShapedRecipeBuilder;
+import net.minecraft.data.recipes.ShapelessRecipeBuilder;
 import net.minecraft.world.item.Items;
 
 public class ModRecipeProvider extends RecipeProvider {
@@ -87,6 +90,17 @@ public class ModRecipeProvider extends RecipeProvider {
                 .unlockedBy("has_neoferrite_ingot", has(ModItems.NEOFERRITE_INGOT.get()))
                 .save(recipeOutput, modLoc("rack"));
 
+        // 2b. Cold Rack (x1) - Rack frío de alta densidad
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.COLD_RACK.get(), 1)
+                .pattern("ICI")
+                .pattern("CRC")
+                .pattern("ICI")
+                .define('I', Items.IRON_INGOT)
+                .define('C', ModItems.DATA_CRYSTAL.get())
+                .define('R', ModBlocks.RACK.get())
+                .unlockedBy("has_rack", has(ModBlocks.RACK.get()))
+                .save(recipeOutput, modLoc("cold_rack"));
+
         // 3. Data Module (x1) - Módulo de datos
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.DATA_MODULE.get(), 1)
                 .pattern("NRN")
@@ -98,6 +112,29 @@ public class ModRecipeProvider extends RecipeProvider {
                 .define('I', Items.IRON_INGOT)
                 .unlockedBy("has_data_crystal", has(ModItems.DATA_CRYSTAL.get()))
                 .save(recipeOutput, modLoc("data_module"));
+
+        // 3b. Data Module Advanced (x1) - Módulo de datos avanzado
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.DATA_MODULE_ADVANCED.get(), 1)
+                .pattern("SCS")
+                .pattern("SMS")
+                .pattern("SNS")
+                .define('S', ModItems.CRYSTAL_SHARD.get())
+                .define('C', ModItems.DATA_CRYSTAL.get())
+                .define('M', ModItems.DATA_MODULE.get())
+                .define('N', ModItems.NEOFERRITE_INGOT.get())
+                .unlockedBy("has_crystal_shard", has(ModItems.CRYSTAL_SHARD.get()))
+                .save(recipeOutput, modLoc("data_module_advanced"));
+
+        // 3c. Data Module Master (x1) - Módulo de datos maestro
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.DATA_MODULE_MASTER.get(), 1)
+                .pattern("SCS")
+                .pattern("CMC")
+                .pattern("SCS")
+                .define('S', ModItems.CRYSTAL_SHARD.get())
+                .define('C', ModItems.DATA_CRYSTAL.get())
+                .define('M', ModItems.DATA_MODULE_ADVANCED.get())
+                .unlockedBy("has_crystal_shard", has(ModItems.CRYSTAL_SHARD.get()))
+                .save(recipeOutput, modLoc("data_module_master"));
 
         // 4. Core (x1) - Núcleo maestro
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.CORE.get(), 1)
@@ -158,5 +195,136 @@ public class ModRecipeProvider extends RecipeProvider {
                 .define('C', Items.COBBLESTONE)
                 .unlockedBy("has_iron_pickaxe", has(Items.IRON_PICKAXE))
                 .save(recipeOutput, modLoc("drill"));
+
+        // 8b. Alarm (x1) - Alarma de red
+        ShapedRecipeBuilder.shaped(RecipeCategory.REDSTONE, ModBlocks.ALARM.get(), 1)
+                .pattern(" T ")
+                .pattern("INI")
+                .pattern("IRI")
+                .define('T', Items.REDSTONE_TORCH)
+                .define('N', ModItems.NEOFERRITE_INGOT.get())
+                .define('R', Items.REDSTONE)
+                .define('I', Items.IRON_INGOT)
+                .unlockedBy("has_neoferrite_ingot", has(ModItems.NEOFERRITE_INGOT.get()))
+                .save(recipeOutput, modLoc("alarm"));
+
+        // 8c. Coal Generator (x1) - Generador temporal de carbón
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.COAL_GENERATOR.get(), 1)
+                .pattern("III")
+                .pattern("IFI")
+                .pattern("CRC")
+                .define('I', Items.IRON_INGOT)
+                .define('F', Items.FURNACE)
+                .define('R', Items.REDSTONE)
+                .define('C', Items.COBBLESTONE)
+                .unlockedBy("has_furnace", has(Items.FURNACE))
+                .save(recipeOutput, modLoc("coal_generator"));
+
+        // 9. Recetas del Triturador (logtech:crushing)
+        ProcessingRecipeBuilder.crushing(ModItems.RAW_NEOFERRITE.get())
+                .addOutput(ModItems.NEOFERRITE_DUST.get(), 2)
+                .energy(4000)
+                .ticks(100)
+                .purityMode(io.github.chema280101.logtech.machine.recipe.PurityMode.PRESERVE)
+                .unlockedBy("has_raw_neoferrite", has(ModItems.RAW_NEOFERRITE.get()))
+                .save(recipeOutput, modLoc("crushing/raw_neoferrite"));
+
+        ProcessingRecipeBuilder.crushing(ModItems.RAW_CRYSTALITE.get())
+                .addOutput(ModItems.CRYSTALITE_DUST.get(), 2)
+                .energy(4000)
+                .ticks(100)
+                .purityMode(PurityMode.PRESERVE)
+                .unlockedBy("has_raw_crystalite", has(ModItems.RAW_CRYSTALITE.get()))
+                .save(recipeOutput, modLoc("crushing/raw_crystalite"));
+
+        // 10. Centrífuga (x1) - Separador industrial de subproductos
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.CENTRIFUGE.get(), 1)
+                .pattern("INI")
+                .pattern("NRN")
+                .pattern("ICI")
+                .define('I', Items.IRON_INGOT)
+                .define('N', ModItems.NEOFERRITE_INGOT.get())
+                .define('R', Items.REDSTONE)
+                .define('C', ModItems.DATA_CRYSTAL.get())
+                .unlockedBy("has_neoferrite_ingot", has(ModItems.NEOFERRITE_INGOT.get()))
+                .save(recipeOutput, modLoc("centrifuge"));
+
+        // 11. Bloque de escoria industrial (x1) a partir de 4 escorias
+        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, ModBlocks.SLAG_BLOCK.get(), 1)
+                .pattern("SS")
+                .pattern("SS")
+                .define('S', ModItems.SLAG.get())
+                .unlockedBy("has_slag", has(ModItems.SLAG.get()))
+                .save(recipeOutput, modLoc("slag_block"));
+
+        // 11b. Desarmar bloque de escoria en 4 escorias
+        ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ModItems.SLAG.get(), 4)
+                .requires(ModBlocks.SLAG_BLOCK.get())
+                .unlockedBy("has_slag_block", has(ModBlocks.SLAG_BLOCK.get()))
+                .save(recipeOutput, modLoc("slag_from_slag_block"));
+
+        // 12. Recetas de la Centrífuga (logtech:centrifuging)
+        // Polvo de neoferrita: 1 polvo (120 ticks, 80 FE/t = 9600 FE) -> 1 polvo (100%) + escoria (80% escalada con inverse_purity)
+        ProcessingRecipeBuilder.centrifuging(ModItems.NEOFERRITE_DUST.get())
+                .addOutput(ModItems.NEOFERRITE_DUST.get(), 1, 1.0f, OutputScaling.NONE)
+                .addOutput(ModItems.SLAG.get(), 1, 0.8f, OutputScaling.INVERSE_PURITY)
+                .energy(9600)
+                .ticks(120)
+                .purityMode(PurityMode.PRESERVE)
+                .unlockedBy("has_neoferrite_dust", has(ModItems.NEOFERRITE_DUST.get()))
+                .save(recipeOutput, modLoc("centrifuging/neoferrite_dust"));
+
+        // Polvo de cristalita: 1 polvo (120 ticks, 80 FE/t = 9600 FE) -> 1 polvo (100%) + escoria (80% escalada con inverse_purity)
+        ProcessingRecipeBuilder.centrifuging(ModItems.CRYSTALITE_DUST.get())
+                .addOutput(ModItems.CRYSTALITE_DUST.get(), 1, 1.0f, OutputScaling.NONE)
+                .addOutput(ModItems.SLAG.get(), 1, 0.8f, OutputScaling.INVERSE_PURITY)
+                .energy(9600)
+                .ticks(120)
+                .purityMode(PurityMode.PRESERVE)
+                .unlockedBy("has_crystalite_dust", has(ModItems.CRYSTALITE_DUST.get()))
+                .save(recipeOutput, modLoc("centrifuging/crystalite_dust"));
+
+        // Lodo: 1 lodo (120 ticks, 80 FE/t = 9600 FE) -> 1 fragmento de cristal (25% de probabilidad)
+        ProcessingRecipeBuilder.centrifuging(ModItems.SLUDGE.get())
+                .addOutput(ModItems.CRYSTAL_SHARD.get(), 1, 0.25f, OutputScaling.NONE)
+                .energy(9600)
+                .ticks(120)
+                .purityMode(PurityMode.PRESERVE)
+                .unlockedBy("has_sludge", has(ModItems.SLUDGE.get()))
+                .save(recipeOutput, modLoc("centrifuging/sludge"));
+
+        // 13. Lavadora (x1) - Purificador de minerales por flotación y agua
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.WASHER.get(), 1)
+                .pattern("INI")
+                .pattern("NBN")
+                .pattern("ICI")
+                .define('I', Items.IRON_INGOT)
+                .define('N', ModItems.NEOFERRITE_INGOT.get())
+                .define('B', Items.WATER_BUCKET)
+                .define('C', ModItems.DATA_CRYSTAL.get())
+                .unlockedBy("has_neoferrite_ingot", has(ModItems.NEOFERRITE_INGOT.get()))
+                .save(recipeOutput, modLoc("washer"));
+
+        // 14. Recetas de la Lavadora (logtech:washing)
+        // 1 polvo de pureza p (<5) + 250 mB agua en 80 ticks @ 60 FE/t (4800 FE) -> 1 polvo pureza p+1 + 1 lodo
+        ProcessingRecipeBuilder.washing(ModItems.NEOFERRITE_DUST.get())
+                .addOutput(ModItems.NEOFERRITE_DUST.get(), 1)
+                .addOutput(ModItems.SLUDGE.get(), 1)
+                .energy(4800)
+                .ticks(80)
+                .fluidAmount(250)
+                .purityMode(PurityMode.INCREASE)
+                .unlockedBy("has_neoferrite_dust", has(ModItems.NEOFERRITE_DUST.get()))
+                .save(recipeOutput, modLoc("washing/neoferrite_dust"));
+
+        ProcessingRecipeBuilder.washing(ModItems.CRYSTALITE_DUST.get())
+                .addOutput(ModItems.CRYSTALITE_DUST.get(), 1)
+                .addOutput(ModItems.SLUDGE.get(), 1)
+                .energy(4800)
+                .ticks(80)
+                .fluidAmount(250)
+                .purityMode(PurityMode.INCREASE)
+                .unlockedBy("has_crystalite_dust", has(ModItems.CRYSTALITE_DUST.get()))
+                .save(recipeOutput, modLoc("washing/crystalite_dust"));
     }
 }

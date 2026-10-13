@@ -24,7 +24,8 @@ public record TerminalActionPayload(
         EXTRACT_SHIFT,
         INSERT_CURSOR_ALL,
         INSERT_CURSOR_ONE,
-        INSERT_SLOT
+        INSERT_SLOT,
+        CYCLE_PIN_POLICY
     }
 
     public static final Type<TerminalActionPayload> TYPE =

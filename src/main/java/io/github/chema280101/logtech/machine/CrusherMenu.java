@@ -12,17 +12,18 @@ import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import io.github.chema280101.logtech.network.EnergyPriority;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
-public class CrusherMenu extends AbstractContainerMenu {
+public class CrusherMenu extends AbstractContainerMenu implements PriorityConfigurableMenu {
     private final BlockPos pos;
     private final ContainerData data;
 
     // Constructor cliente
     public CrusherMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buf) {
-        this(containerId, playerInventory, buf.readBlockPos(), new ItemStackHandler(2), new SimpleContainerData(7));
+        this(containerId, playerInventory, buf.readBlockPos(), new ItemStackHandler(2), new SimpleContainerData(8));
     }
 
     // Constructor servidor
@@ -31,7 +32,7 @@ public class CrusherMenu extends AbstractContainerMenu {
         this.pos = pos;
         this.data = data;
 
-        checkContainerDataCount(data, 7);
+        checkContainerDataCount(data, 8);
         addDataSlots(data);
 
         // Ranura 0: Entrada
@@ -87,6 +88,16 @@ public class CrusherMenu extends AbstractContainerMenu {
     }
 
     @Override
+    public EnergyPriority getEnergyPriority() {
+        return EnergyPriority.fromOrdinal(this.data.get(7));
+    }
+
+    @Override
+    public void setEnergyPriority(EnergyPriority priority) {
+        this.data.set(7, priority != null ? priority.ordinal() : EnergyPriority.NORMAL.ordinal());
+    }
+
+    @Override
     public boolean stillValid(Player player) {
         return stillValid(ContainerLevelAccess.create(player.level(), this.pos), player, ModBlocks.CRUSHER.get());
     }
@@ -109,7 +120,7 @@ public class CrusherMenu extends AbstractContainerMenu {
                     return ItemStack.EMPTY;
                 }
             } else { // Desde el inventario del jugador
-                if (CrusherRecipes.hasRecipe(stackInSlot)) {
+                if (hasRecipe(player.level(), stackInSlot)) {
                     if (!this.moveItemStackTo(stackInSlot, 0, 1, false)) {
                         return ItemStack.EMPTY;
                     }
@@ -138,5 +149,17 @@ public class CrusherMenu extends AbstractContainerMenu {
         }
 
         return itemstack;
+    }
+
+    private boolean hasRecipe(net.minecraft.world.level.Level level, ItemStack stack) {
+        if (stack.isEmpty() || level == null) {
+            return false;
+        }
+        return level.getRecipeManager()
+                .getRecipeFor(
+                        io.github.chema280101.logtech.registry.ModRecipeTypes.CRUSHING.get(),
+                        new net.minecraft.world.item.crafting.SingleRecipeInput(stack),
+                        level
+                ).isPresent();
     }
 }

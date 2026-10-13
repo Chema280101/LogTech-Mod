@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_neoferrite_dust": {
+      "conditions": {
+        "items": [
+          {
+            "items": "logtech:neoferrite_dust"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "logtech:centrifuging/neoferrite_dust"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_neoferrite_dust"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "logtech:centrifuging/neoferrite_dust"
+    ]
+  }
+}

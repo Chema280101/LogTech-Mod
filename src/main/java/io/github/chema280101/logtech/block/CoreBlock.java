@@ -111,49 +111,15 @@ public class CoreBlock extends Block implements EntityBlock {
             return InteractionResult.SUCCESS;
         }
 
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be instanceof CoreBlockEntity coreBe) {
-            coreBe.showNetworkStatus(player);
-            int typesCount = coreBe.getAll().size();
-            long totalCount = coreBe.getTotalStored();
-            long capacity = coreBe.getCapacity();
-            if (!coreBe.isPowered()) {
-                player.sendSystemMessage(
-                        Component.translatable(
-                                "chat.logtech.core.status_no_energy",
-                                coreBe.getEnergyStored(),
-                                coreBe.getMaxEnergyStored(),
-                                coreBe.getEnergyConsumptionPerTick()
-                        )
-                );
-            } else if (coreBe.isOverloaded()) {
-                player.sendSystemMessage(
-                        Component.translatable("chat.logtech.core.status_overloaded", typesCount, totalCount, capacity)
-                );
-            } else {
-                player.sendSystemMessage(
-                        Component.translatable("chat.logtech.core.status_capacity", typesCount, totalCount, capacity)
-                );
-            }
-            player.sendSystemMessage(
-                    Component.translatable(
-                            "chat.logtech.core.status_energy",
-                            coreBe.getEnergyStored(),
-                            coreBe.getMaxEnergyStored(),
-                            coreBe.getEnergyConsumptionPerTick()
-                    )
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            serverPlayer.openMenu(
+                    new net.minecraft.world.SimpleMenuProvider(
+                            (containerId, inventory, p) -> new CoreMenu(containerId, inventory, pos),
+                            Component.translatable("container.logtech.core")
+                    ),
+                    buf -> buf.writeBlockPos(pos)
             );
-            List<NetworkMember> members = coreBe.getMembers();
-            for (NetworkMember member : members) {
-                player.sendSystemMessage(
-                        Component.translatable(
-                                "chat.logtech.core.machine_status",
-                                member.getName(),
-                                member.getStatus().getDisplayName()
-                        )
-                );
-            }
-            return InteractionResult.SUCCESS;
+            return InteractionResult.CONSUME;
         }
 
         return InteractionResult.PASS;

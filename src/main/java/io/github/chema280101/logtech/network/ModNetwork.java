@@ -52,6 +52,16 @@ public class ModNetwork {
                 CoreRuleUpdatePayload::handle
         );
         registrar.playToServer(
+                CoreClaimPayload.TYPE,
+                CoreClaimPayload.STREAM_CODEC,
+                CoreClaimPayload::handle
+        );
+        registrar.playToServer(
+                CoreAccessUpdatePayload.TYPE,
+                CoreAccessUpdatePayload.STREAM_CODEC,
+                CoreAccessUpdatePayload::handle
+        );
+        registrar.playToServer(
                 MachinePriorityPayload.TYPE,
                 MachinePriorityPayload.STREAM_CODEC,
                 MachinePriorityPayload::handle
@@ -65,6 +75,31 @@ public class ModNetwork {
                 TerminalPriorityPayload.TYPE,
                 TerminalPriorityPayload.STREAM_CODEC,
                 TerminalPriorityPayload::handle
+        );
+        registrar.playToClient(
+                TerminalTrashPayload.TYPE,
+                TerminalTrashPayload.STREAM_CODEC,
+                TerminalTrashPayload::handle
+        );
+        registrar.playToClient(
+                TerminalViewPayload.TYPE,
+                TerminalViewPayload.STREAM_CODEC,
+                TerminalViewPayload::handle
+        );
+        registrar.playToServer(
+                TerminalViewUpdatePayload.TYPE,
+                TerminalViewUpdatePayload.STREAM_CODEC,
+                TerminalViewUpdatePayload::handle
+        );
+        registrar.playToServer(
+                TerminalLogRequestPayload.TYPE,
+                TerminalLogRequestPayload.STREAM_CODEC,
+                TerminalLogRequestPayload::handle
+        );
+        registrar.playToClient(
+                TerminalLogPagePayload.TYPE,
+                TerminalLogPagePayload.STREAM_CODEC,
+                TerminalLogPagePayload::handle
         );
     }
 }

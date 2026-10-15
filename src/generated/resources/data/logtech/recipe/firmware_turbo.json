@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "logtech:data_crystal"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "S": {
+      "item": "logtech:crystal_shard"
+    }
+  },
+  "pattern": [
+    " R ",
+    "SCS",
+    " R "
+  ],
+  "result": {
+    "count": 1,
+    "id": "logtech:firmware_turbo"
+  }
+}

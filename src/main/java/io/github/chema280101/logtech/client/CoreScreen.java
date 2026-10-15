@@ -1,13 +1,18 @@
 package io.github.chema280101.logtech.client;
 
 import io.github.chema280101.logtech.block.CoreMenu;
+import io.github.chema280101.logtech.network.CoreAccessUpdatePayload;
+import io.github.chema280101.logtech.network.CoreClaimPayload;
 import io.github.chema280101.logtech.network.CoreRuleUpdatePayload;
 import io.github.chema280101.logtech.network.CoreSyncPayload;
+import io.github.chema280101.logtech.security.SecurityMode;
+import io.github.chema280101.logtech.security.SecurityPermission;
 import io.github.chema280101.logtech.storage.RuleAction;
 import io.github.chema280101.logtech.storage.RuleConditionType;
 import io.github.chema280101.logtech.storage.RuleEngine;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -23,22 +28,42 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
 
     public enum Tab {
         STATUS,
-        RULES
+        RULES,
+        ACCESS
     }
 
     private Tab currentTab = Tab.STATUS;
     private Button statusTabButton;
     private Button rulesTabButton;
+    private Button accessTabButton;
+    private Button claimButton;
     private int machineScroll = 0;
 
+    // Widgets para la pestaña de reglas
     private static class RowWidgets {
         Button condButton;
         EditBox threshBox;
         Button actButton;
         Button toggleButton;
     }
-
     private final List<RowWidgets> ruleWidgets = new ArrayList<>(RuleEngine.MAX_RULES);
+
+    // Widgets para la pestaña de acceso
+    private static class AccessRowWidgets {
+        Button viewBtn;
+        Button extractBtn;
+        Button insertBtn;
+        Button adminBtn;
+        Button removeBtn;
+    }
+    private Button modeButton;
+    private Button accessPrevBtn;
+    private Button accessNextBtn;
+    private Button cycleOnlinePlayerBtn;
+    private Button addPlayerBtn;
+    private int accessPage = 0;
+    private int selectedOnlinePlayerIdx = 0;
+    private final List<AccessRowWidgets> accessRowWidgets = new ArrayList<>(4);
 
     public CoreScreen(CoreMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -57,22 +82,34 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
         // Botones de pestañas superiores
         int tabY = this.topPos - 18;
         int statusTabX = this.leftPos + 6;
-        int statusTabW = 54;
-        int rulesTabX = statusTabX + statusTabW + 2;
-        int rulesTabW = 54;
+        int tabW = 48;
 
         this.statusTabButton = Button.builder(
                 Component.translatable("gui.logtech.core.tab.status"),
                 btn -> selectTab(Tab.STATUS)
-        ).bounds(statusTabX, tabY, statusTabW, 18).build();
+        ).bounds(statusTabX, tabY, tabW, 18).build();
 
         this.rulesTabButton = Button.builder(
                 Component.translatable("gui.logtech.core.tab.rules"),
                 btn -> selectTab(Tab.RULES)
-        ).bounds(rulesTabX, tabY, rulesTabW, 18).build();
+        ).bounds(statusTabX + tabW + 2, tabY, tabW, 18).build();
+
+        this.accessTabButton = Button.builder(
+                Component.translatable("gui.logtech.core.tab.access"),
+                btn -> selectTab(Tab.ACCESS)
+        ).bounds(statusTabX + (tabW + 2) * 2, tabY, tabW, 18).build();
+
+        this.claimButton = Button.builder(
+                Component.translatable("gui.logtech.core.claim"),
+                btn -> onClaimClicked()
+        ).bounds(this.leftPos + this.imageWidth - 58, tabY, 52, 18)
+        .tooltip(Tooltip.create(Component.translatable("gui.logtech.core.claim.tooltip")))
+        .build();
 
         this.addRenderableWidget(this.statusTabButton);
         this.addRenderableWidget(this.rulesTabButton);
+        this.addRenderableWidget(this.accessTabButton);
+        this.addRenderableWidget(this.claimButton);
 
         // Widgets de las 8 filas de reglas
         this.ruleWidgets.clear();
@@ -84,26 +121,22 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
 
             RowWidgets rw = new RowWidgets();
 
-            // Botón de condición
             rw.condButton = Button.builder(
                     getConditionButtonText(rowIndex),
                     btn -> cycleCondition(rowIndex)
             ).bounds(this.leftPos + 24, rowY, 48, 13).build();
 
-            // Campo de umbral
             rw.threshBox = new EditBox(this.font, this.leftPos + 74, rowY, 42, 13, Component.literal("Threshold"));
             rw.threshBox.setMaxLength(10);
             rw.threshBox.setFilter(s -> s.matches("\\d*"));
             rw.threshBox.setValue(getThresholdText(rowIndex));
             rw.threshBox.setResponder(text -> onThresholdChanged(rowIndex, text));
 
-            // Botón de acción
             rw.actButton = Button.builder(
                     getActionButtonText(rowIndex),
                     btn -> cycleAction(rowIndex)
             ).bounds(this.leftPos + 118, rowY, 50, 13).build();
 
-            // Botón de activar/desactivar
             rw.toggleButton = Button.builder(
                     getToggleButtonText(rowIndex),
                     btn -> toggleEnabled(rowIndex)
@@ -117,7 +150,83 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
             this.addRenderableWidget(rw.toggleButton);
         }
 
+        // Widgets de la pestaña de acceso
+        this.modeButton = Button.builder(
+                getModeButtonText(),
+                btn -> toggleSecurityMode()
+        ).bounds(this.leftPos + 8, this.topPos + 18, 92, 14).build();
+        this.addRenderableWidget(this.modeButton);
+
+        this.accessPrevBtn = Button.builder(
+                Component.literal("<"),
+                btn -> { if (this.accessPage > 0) this.accessPage--; updateAccessButtonTexts(); }
+        ).bounds(this.leftPos + 172, this.topPos + 18, 14, 14).build();
+        this.addRenderableWidget(this.accessPrevBtn);
+
+        this.accessNextBtn = Button.builder(
+                Component.literal(">"),
+                btn -> {
+                    if ((this.accessPage + 1) * 4 < this.menu.getClientAccessEntries().size()) {
+                        this.accessPage++;
+                        updateAccessButtonTexts();
+                    }
+                }
+        ).bounds(this.leftPos + 188, this.topPos + 18, 14, 14).build();
+        this.addRenderableWidget(this.accessNextBtn);
+
+        this.accessRowWidgets.clear();
+        for (int r = 0; r < 4; r++) {
+            final int rowIdx = r;
+            int rY = this.topPos + 34 + r * 17;
+            AccessRowWidgets arw = new AccessRowWidgets();
+
+            arw.viewBtn = Button.builder(Component.literal("V"), btn -> onTogglePerm(rowIdx, SecurityPermission.VIEW))
+                    .bounds(this.leftPos + 92, rY, 16, 14)
+                    .tooltip(Tooltip.create(Component.translatable("gui.logtech.security.perm.view")))
+                    .build();
+
+            arw.extractBtn = Button.builder(Component.literal("E"), btn -> onTogglePerm(rowIdx, SecurityPermission.EXTRACT))
+                    .bounds(this.leftPos + 110, rY, 16, 14)
+                    .tooltip(Tooltip.create(Component.translatable("gui.logtech.security.perm.extract")))
+                    .build();
+
+            arw.insertBtn = Button.builder(Component.literal("I"), btn -> onTogglePerm(rowIdx, SecurityPermission.INSERT))
+                    .bounds(this.leftPos + 128, rY, 16, 14)
+                    .tooltip(Tooltip.create(Component.translatable("gui.logtech.security.perm.insert")))
+                    .build();
+
+            arw.adminBtn = Button.builder(Component.literal("A"), btn -> onTogglePerm(rowIdx, SecurityPermission.ADMIN))
+                    .bounds(this.leftPos + 146, rY, 16, 14)
+                    .tooltip(Tooltip.create(Component.translatable("gui.logtech.security.perm.admin")))
+                    .build();
+
+            arw.removeBtn = Button.builder(Component.literal("×").withStyle(ChatFormatting.RED), btn -> onRemovePlayer(rowIdx))
+                    .bounds(this.leftPos + 192, rY, 16, 14)
+                    .tooltip(Tooltip.create(Component.translatable("gui.logtech.security.perm.remove")))
+                    .build();
+
+            this.accessRowWidgets.add(arw);
+            this.addRenderableWidget(arw.viewBtn);
+            this.addRenderableWidget(arw.extractBtn);
+            this.addRenderableWidget(arw.insertBtn);
+            this.addRenderableWidget(arw.adminBtn);
+            this.addRenderableWidget(arw.removeBtn);
+        }
+
+        this.cycleOnlinePlayerBtn = Button.builder(
+                getOnlinePlayerButtonText(),
+                btn -> cycleOnlinePlayer()
+        ).bounds(this.leftPos + 8, this.topPos + 106, 140, 15).build();
+        this.addRenderableWidget(this.cycleOnlinePlayerBtn);
+
+        this.addPlayerBtn = Button.builder(
+                Component.translatable("gui.logtech.security.add"),
+                btn -> onAddPlayer()
+        ).bounds(this.leftPos + 152, this.topPos + 106, 56, 15).build();
+        this.addRenderableWidget(this.addPlayerBtn);
+
         updateWidgetVisibility();
+        updateAccessButtonTexts();
     }
 
     private void selectTab(Tab tab) {
@@ -129,14 +238,23 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
     }
 
     private void updateWidgetVisibility() {
+        boolean canAdmin = this.menu.canClientAdmin();
+        if (!canAdmin && this.currentTab == Tab.ACCESS) {
+            this.currentTab = Tab.STATUS;
+        }
+
         boolean isStatus = (this.currentTab == Tab.STATUS);
         boolean isRules = (this.currentTab == Tab.RULES);
+        boolean isAccess = (this.currentTab == Tab.ACCESS);
 
-        if (this.statusTabButton != null) {
-            this.statusTabButton.active = !isStatus;
+        if (this.statusTabButton != null) this.statusTabButton.active = !isStatus;
+        if (this.rulesTabButton != null) this.rulesTabButton.active = !isRules;
+        if (this.accessTabButton != null) {
+            this.accessTabButton.visible = canAdmin;
+            this.accessTabButton.active = !isAccess;
         }
-        if (this.rulesTabButton != null) {
-            this.rulesTabButton.active = !isRules;
+        if (this.claimButton != null) {
+            this.claimButton.visible = this.menu.isClientClaimable();
         }
 
         for (RowWidgets rw : this.ruleWidgets) {
@@ -145,6 +263,147 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
             if (rw.actButton != null) rw.actButton.visible = isRules;
             if (rw.toggleButton != null) rw.toggleButton.visible = isRules;
         }
+
+        if (this.modeButton != null) this.modeButton.visible = isAccess;
+        if (this.accessPrevBtn != null) this.accessPrevBtn.visible = isAccess;
+        if (this.accessNextBtn != null) this.accessNextBtn.visible = isAccess;
+        if (this.cycleOnlinePlayerBtn != null) this.cycleOnlinePlayerBtn.visible = isAccess;
+        if (this.addPlayerBtn != null) this.addPlayerBtn.visible = isAccess;
+
+        List<CoreSyncPayload.AccessEntryDto> entries = this.menu.getClientAccessEntries();
+        for (int r = 0; r < 4; r++) {
+            AccessRowWidgets arw = this.accessRowWidgets.get(r);
+            int entryIdx = this.accessPage * 4 + r;
+            boolean hasEntry = isAccess && (entryIdx < entries.size());
+
+            if (arw.viewBtn != null) arw.viewBtn.visible = hasEntry;
+            if (arw.extractBtn != null) arw.extractBtn.visible = hasEntry;
+            if (arw.insertBtn != null) arw.insertBtn.visible = hasEntry;
+            if (arw.adminBtn != null) arw.adminBtn.visible = hasEntry;
+            if (arw.removeBtn != null) arw.removeBtn.visible = hasEntry;
+        }
+    }
+
+    private void updateAccessButtonTexts() {
+        if (this.modeButton != null) {
+            this.modeButton.setMessage(getModeButtonText());
+        }
+
+        List<CoreSyncPayload.AccessEntryDto> entries = this.menu.getClientAccessEntries();
+        for (int r = 0; r < 4; r++) {
+            AccessRowWidgets arw = this.accessRowWidgets.get(r);
+            int entryIdx = this.accessPage * 4 + r;
+            if (entryIdx < entries.size()) {
+                CoreSyncPayload.AccessEntryDto e = entries.get(entryIdx);
+                if (arw.viewBtn != null) arw.viewBtn.setMessage(Component.literal("V").withStyle(e.canView() ? ChatFormatting.GREEN : ChatFormatting.DARK_GRAY));
+                if (arw.extractBtn != null) arw.extractBtn.setMessage(Component.literal("E").withStyle(e.canExtract() ? ChatFormatting.GREEN : ChatFormatting.DARK_GRAY));
+                if (arw.insertBtn != null) arw.insertBtn.setMessage(Component.literal("I").withStyle(e.canInsert() ? ChatFormatting.GREEN : ChatFormatting.DARK_GRAY));
+                if (arw.adminBtn != null) arw.adminBtn.setMessage(Component.literal("A").withStyle(e.canAdmin() ? ChatFormatting.GOLD : ChatFormatting.DARK_GRAY));
+            }
+        }
+
+        if (this.cycleOnlinePlayerBtn != null) {
+            this.cycleOnlinePlayerBtn.setMessage(getOnlinePlayerButtonText());
+        }
+        if (this.accessPrevBtn != null) {
+            this.accessPrevBtn.active = this.accessPage > 0;
+        }
+        if (this.accessNextBtn != null) {
+            this.accessNextBtn.active = (this.accessPage + 1) * 4 < entries.size();
+        }
+    }
+
+    private Component getModeButtonText() {
+        int ord = this.menu.getClientSecurityModeOrdinal();
+        SecurityMode mode = SecurityMode.values()[Math.max(0, Math.min(SecurityMode.values().length - 1, ord))];
+        return mode == SecurityMode.OPEN
+                ? Component.translatable("gui.logtech.security.mode.open").withStyle(ChatFormatting.AQUA)
+                : Component.translatable("gui.logtech.security.mode.private").withStyle(ChatFormatting.GOLD);
+    }
+
+    private Component getOnlinePlayerButtonText() {
+        List<CoreSyncPayload.OnlinePlayerDto> online = this.menu.getClientOnlinePlayers();
+        if (online.isEmpty()) {
+            return Component.translatable("gui.logtech.security.no_online_players").withStyle(ChatFormatting.GRAY);
+        }
+        if (selectedOnlinePlayerIdx >= online.size()) {
+            selectedOnlinePlayerIdx = 0;
+        }
+        return Component.literal(online.get(selectedOnlinePlayerIdx).name());
+    }
+
+    private void toggleSecurityMode() {
+        int next = (this.menu.getClientSecurityModeOrdinal() == 0) ? 1 : 0;
+        PacketDistributor.sendToServer(new CoreAccessUpdatePayload(
+                this.menu.containerId,
+                CoreAccessUpdatePayload.ActionType.SET_MODE,
+                next,
+                null,
+                "",
+                0
+        ));
+    }
+
+    private void onTogglePerm(int rowIdx, SecurityPermission permission) {
+        List<CoreSyncPayload.AccessEntryDto> entries = this.menu.getClientAccessEntries();
+        int entryIdx = this.accessPage * 4 + rowIdx;
+        if (entryIdx < entries.size()) {
+            UUID target = entries.get(entryIdx).uuid();
+            PacketDistributor.sendToServer(new CoreAccessUpdatePayload(
+                    this.menu.containerId,
+                    CoreAccessUpdatePayload.ActionType.TOGGLE_PERMISSION,
+                    0,
+                    target,
+                    "",
+                    permission.ordinal()
+            ));
+        }
+    }
+
+    private void onRemovePlayer(int rowIdx) {
+        List<CoreSyncPayload.AccessEntryDto> entries = this.menu.getClientAccessEntries();
+        int entryIdx = this.accessPage * 4 + rowIdx;
+        if (entryIdx < entries.size()) {
+            UUID target = entries.get(entryIdx).uuid();
+            PacketDistributor.sendToServer(new CoreAccessUpdatePayload(
+                    this.menu.containerId,
+                    CoreAccessUpdatePayload.ActionType.REMOVE_PLAYER,
+                    0,
+                    target,
+                    "",
+                    0
+            ));
+        }
+    }
+
+    private void cycleOnlinePlayer() {
+        List<CoreSyncPayload.OnlinePlayerDto> online = this.menu.getClientOnlinePlayers();
+        if (!online.isEmpty()) {
+            this.selectedOnlinePlayerIdx = (this.selectedOnlinePlayerIdx + 1) % online.size();
+            updateAccessButtonTexts();
+        }
+    }
+
+    private void onAddPlayer() {
+        List<CoreSyncPayload.OnlinePlayerDto> online = this.menu.getClientOnlinePlayers();
+        if (!online.isEmpty()) {
+            if (selectedOnlinePlayerIdx >= online.size()) {
+                selectedOnlinePlayerIdx = 0;
+            }
+            CoreSyncPayload.OnlinePlayerDto p = online.get(selectedOnlinePlayerIdx);
+            PacketDistributor.sendToServer(new CoreAccessUpdatePayload(
+                    this.menu.containerId,
+                    CoreAccessUpdatePayload.ActionType.ADD_PLAYER,
+                    0,
+                    p.uuid(),
+                    p.name(),
+                    0
+            ));
+        }
+    }
+
+    private void onClaimClicked() {
+        PacketDistributor.sendToServer(new CoreClaimPayload(this.menu.containerId));
     }
 
     private CoreSyncPayload.RuleDto getRuleDto(int index) {
@@ -164,6 +423,7 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
             case ITEM_COUNT_LESS -> Component.translatable("gui.logtech.core.rule.cond.item_less");
             case TOTAL_SPACE_GREATER -> Component.translatable("gui.logtech.core.rule.cond.space_greater");
             case TOTAL_SPACE_LESS -> Component.translatable("gui.logtech.core.rule.cond.space_less");
+            case QUARANTINE_GREATER -> Component.translatable("gui.logtech.core.rule.cond.quarantine_greater");
         };
     }
 
@@ -183,6 +443,8 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
             case REDSTONE_2 -> Component.translatable("gui.logtech.core.rule.act.redstone_2");
             case REDSTONE_3 -> Component.translatable("gui.logtech.core.rule.act.redstone_3");
             case REDSTONE_4 -> Component.translatable("gui.logtech.core.rule.act.redstone_4");
+            case DISCARD_EXCESS -> Component.translatable("gui.logtech.core.rule.act.discard_excess");
+            case COMPACT -> Component.translatable("gui.logtech.core.rule.act.compact");
         };
     }
 
@@ -195,126 +457,111 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
     }
 
     private void onSyncReceived() {
-        for (int i = 0; i < this.ruleWidgets.size(); i++) {
+        for (int i = 0; i < RuleEngine.MAX_RULES && i < this.ruleWidgets.size(); i++) {
             RowWidgets rw = this.ruleWidgets.get(i);
             rw.condButton.setMessage(getConditionButtonText(i));
-            rw.actButton.setMessage(getActionButtonText(i));
-            rw.toggleButton.setMessage(getToggleButtonText(i));
             if (!rw.threshBox.isFocused()) {
                 rw.threshBox.setValue(getThresholdText(i));
             }
+            rw.actButton.setMessage(getActionButtonText(i));
+            rw.toggleButton.setMessage(getToggleButtonText(i));
         }
+        updateWidgetVisibility();
+        updateAccessButtonTexts();
     }
 
     private void cycleCondition(int index) {
         CoreSyncPayload.RuleDto r = getRuleDto(index);
-        int nextOrd = (r != null ? r.conditionOrdinal() + 1 : 1) % RuleConditionType.values().length;
-        sendUpdate(index, r != null ? r.item() : ItemStack.EMPTY, nextOrd, r != null ? r.threshold() : 0L, r != null ? r.actionOrdinal() : 0, r == null || r.enabled());
+        int ord = r != null ? r.conditionOrdinal() : 0;
+        int next = (ord + 1) % RuleConditionType.values().length;
+        sendRuleUpdate(index, next, r != null ? r.threshold() : 0L, r != null ? r.actionOrdinal() : 0, r == null || r.enabled(), r != null ? r.item() : ItemStack.EMPTY);
+    }
+
+    private void onThresholdChanged(int index, String text) {
+        try {
+            long val = text.isEmpty() ? 0L : Long.parseLong(text);
+            CoreSyncPayload.RuleDto r = getRuleDto(index);
+            sendRuleUpdate(index, r != null ? r.conditionOrdinal() : 0, val, r != null ? r.actionOrdinal() : 0, r == null || r.enabled(), r != null ? r.item() : ItemStack.EMPTY);
+        } catch (NumberFormatException ignored) {}
     }
 
     private void cycleAction(int index) {
         CoreSyncPayload.RuleDto r = getRuleDto(index);
-        int nextOrd = (r != null ? r.actionOrdinal() + 1 : 1) % RuleAction.values().length;
-        sendUpdate(index, r != null ? r.item() : ItemStack.EMPTY, r != null ? r.conditionOrdinal() : 0, r != null ? r.threshold() : 0L, nextOrd, r == null || r.enabled());
+        int ord = r != null ? r.actionOrdinal() : 0;
+        int next = (ord + 1) % RuleAction.values().length;
+        sendRuleUpdate(index, r != null ? r.conditionOrdinal() : 0, r != null ? r.threshold() : 0L, next, r == null || r.enabled(), r != null ? r.item() : ItemStack.EMPTY);
     }
 
     private void toggleEnabled(int index) {
         CoreSyncPayload.RuleDto r = getRuleDto(index);
-        boolean nextEnabled = r == null || !r.enabled();
-        sendUpdate(index, r != null ? r.item() : ItemStack.EMPTY, r != null ? r.conditionOrdinal() : 0, r != null ? r.threshold() : 0L, r != null ? r.actionOrdinal() : 0, nextEnabled);
+        boolean current = r != null && r.enabled();
+        sendRuleUpdate(index, r != null ? r.conditionOrdinal() : 0, r != null ? r.threshold() : 0L, r != null ? r.actionOrdinal() : 0, !current, r != null ? r.item() : ItemStack.EMPTY);
     }
 
-    private void onThresholdChanged(int index, String text) {
-        long val = 0L;
-        try {
-            if (!text.isEmpty()) {
-                val = Long.parseLong(text);
-            }
-        } catch (NumberFormatException ignored) {
-        }
-        CoreSyncPayload.RuleDto r = getRuleDto(index);
-        sendUpdate(index, r != null ? r.item() : ItemStack.EMPTY, r != null ? r.conditionOrdinal() : 0, val, r != null ? r.actionOrdinal() : 0, r == null || r.enabled());
-    }
-
-    private void sendUpdate(int index, ItemStack item, int condOrd, long threshold, int actOrd, boolean enabled) {
+    private void sendRuleUpdate(int index, int conditionOrdinal, long threshold, int actionOrdinal, boolean enabled, ItemStack item) {
         PacketDistributor.sendToServer(new CoreRuleUpdatePayload(
                 this.menu.containerId,
                 index,
-                item != null ? item : ItemStack.EMPTY,
-                condOrd,
+                item,
+                conditionOrdinal,
                 threshold,
-                actOrd,
+                actionOrdinal,
                 enabled
         ));
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (this.currentTab == Tab.RULES) {
-            int startY = this.topPos + 18;
-            for (int i = 0; i < RuleEngine.MAX_RULES; i++) {
-                int ghostX = this.leftPos + 6;
-                int ghostY = startY + i * 15;
-                if (mouseX >= ghostX && mouseX <= ghostX + 16 && mouseY >= ghostY && mouseY <= ghostY + 16) {
-                    ItemStack carried = this.menu.getCarried();
-                    CoreSyncPayload.RuleDto r = getRuleDto(i);
-                    if (!carried.isEmpty()) {
-                        // Asignar copia del ítem
-                        sendUpdate(i, carried.copyWithCount(1), r != null ? r.conditionOrdinal() : 0, r != null ? r.threshold() : 0L, r != null ? r.actionOrdinal() : 0, r == null || r.enabled());
-                    } else {
-                        // Limpiar ranura
-                        sendUpdate(i, ItemStack.EMPTY, r != null ? r.conditionOrdinal() : 0, r != null ? r.threshold() : 0L, r != null ? r.actionOrdinal() : 0, r == null || r.enabled());
+        if (this.currentTab == Tab.STATUS && this.menu.isClientNetworkValid()) {
+            int x = this.leftPos + 10;
+            int y = this.topPos + 80;
+            if (mouseX >= x && mouseX <= x + 200 && mouseY >= y && mouseY <= y + 36) {
+                List<CoreSyncPayload.MachineInfo> machines = this.menu.getClientMachines();
+                if (machines.size() > 3) {
+                    if (button == 0) {
+                        this.machineScroll = (this.machineScroll + 1) % (machines.size() - 2);
+                    } else if (button == 1) {
+                        this.machineScroll = (this.machineScroll - 1 + (machines.size() - 2)) % (machines.size() - 2);
                     }
                     return true;
                 }
             }
         }
+
+        if (this.currentTab == Tab.RULES) {
+            int startY = this.topPos + 18;
+            for (int i = 0; i < RuleEngine.MAX_RULES; i++) {
+                int rowY = startY + i * 15;
+                int ghostX = this.leftPos + 6;
+
+                if (mouseX >= ghostX && mouseX <= ghostX + 16 && mouseY >= rowY && mouseY <= rowY + 16) {
+                    ItemStack carried = this.menu.getCarried();
+                    CoreSyncPayload.RuleDto r = getRuleDto(i);
+                    int cond = r != null ? r.conditionOrdinal() : 0;
+                    long thresh = r != null ? r.threshold() : 0L;
+                    int act = r != null ? r.actionOrdinal() : 0;
+                    boolean en = r == null || r.enabled();
+
+                    if (!carried.isEmpty()) {
+                        sendRuleUpdate(i, cond, thresh, act, en, carried.copyWithCount(1));
+                    } else {
+                        sendRuleUpdate(i, cond, thresh, act, en, ItemStack.EMPTY);
+                    }
+                    return true;
+                }
+            }
+        }
+
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (this.currentTab == Tab.RULES) {
-            int startY = this.topPos + 18;
-            for (int i = 0; i < RuleEngine.MAX_RULES; i++) {
-                int ghostX = this.leftPos + 6;
-                int ghostY = startY + i * 15;
-                if (mouseX >= ghostX && mouseX <= ghostX + 16 && mouseY >= ghostY && mouseY <= ghostY + 16) {
-                    ItemStack carried = this.menu.getCarried();
-                    if (!carried.isEmpty()) {
-                        CoreSyncPayload.RuleDto r = getRuleDto(i);
-                        sendUpdate(i, carried.copyWithCount(1), r != null ? r.conditionOrdinal() : 0, r != null ? r.threshold() : 0L, r != null ? r.actionOrdinal() : 0, r == null || r.enabled());
-                        return true;
-                    }
-                }
-            }
-        }
-        return super.mouseReleased(mouseX, mouseY, button);
-    }
-
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (this.currentTab == Tab.STATUS) {
-            List<CoreSyncPayload.MachineInfo> machines = this.menu.getClientMachines();
-            if (machines != null && machines.size() > 3) {
-                int maxScroll = machines.size() - 3;
-                if (scrollY > 0) {
-                    this.machineScroll = Math.max(0, this.machineScroll - 1);
-                    return true;
-                } else if (scrollY < 0) {
-                    this.machineScroll = Math.min(maxScroll, this.machineScroll + 1);
-                    return true;
-                }
-            }
-        }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
-    }
-
-    @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        Component currentTitle = (this.currentTab == Tab.STATUS)
-                ? Component.translatable("gui.logtech.core.tab.status")
-                : Component.translatable("gui.logtech.core.tab.rules");
+        Component currentTitle = switch (this.currentTab) {
+            case STATUS -> Component.translatable("gui.logtech.core.tab.status");
+            case RULES -> Component.translatable("gui.logtech.core.tab.rules");
+            case ACCESS -> Component.translatable("gui.logtech.core.tab.access");
+        };
         guiGraphics.drawString(this.font, currentTitle, this.titleLabelX, 6, 0xE0E0E0, false);
         guiGraphics.drawString(this.font, this.playerInventoryTitle, this.inventoryLabelX, this.inventoryLabelY, 0x909090, false);
     }
@@ -348,8 +595,10 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
 
         if (this.currentTab == Tab.STATUS) {
             renderStatusTab(guiGraphics);
-        } else {
+        } else if (this.currentTab == Tab.RULES) {
             renderRulesTab(guiGraphics, mouseX, mouseY);
+        } else {
+            renderAccessTab(guiGraphics);
         }
     }
 
@@ -436,7 +685,6 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
             int rowY = startY + i * 15;
             int ghostX = this.leftPos + 6;
 
-            // Ranura fantasma
             guiGraphics.fill(ghostX, rowY, ghostX + 16, rowY + 16, 0xFF121216);
             guiGraphics.renderOutline(ghostX - 1, rowY - 1, 18, 18, 0xFF2A2A34);
 
@@ -449,10 +697,9 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
                 guiGraphics.fill(ghostX, rowY, ghostX + 16, rowY + 16, 0x40FFFFFF);
             }
 
-            // Indicador LED de estado de regla
             int ledX = this.leftPos + 203;
             int ledY = rowY + 4;
-            int ledColor = 0xFF2A2A2A; // Apagado por defecto
+            int ledColor = 0xFF2A2A2A;
 
             if (r != null && r.enabled()) {
                 RuleConditionType cond = RuleConditionType.values()[Math.max(0, Math.min(RuleConditionType.values().length - 1, r.conditionOrdinal()))];
@@ -460,16 +707,47 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
                 boolean missingItem = (cond.requiresItem() || act.requiresItem()) && (r.item() == null || r.item().isEmpty());
 
                 if (missingItem) {
-                    ledColor = 0xFFAA3333; // Rojo oscuro: ignorada por falta de ítem
+                    ledColor = 0xFFAA3333;
                 } else if (r.active()) {
-                    ledColor = 0xFF00E676; // Verde brillante: activa
+                    ledColor = 0xFF00E676;
                 } else {
-                    ledColor = 0xFF555555; // Gris: en espera
+                    ledColor = 0xFF555555;
                 }
             }
 
             guiGraphics.fill(ledX, ledY, ledX + 5, ledY + 5, ledColor);
             guiGraphics.renderOutline(ledX, ledY, 5, 5, 0xFF111111);
+        }
+    }
+
+    private void renderAccessTab(GuiGraphics guiGraphics) {
+        // Dueño
+        String owner = this.menu.getClientOwnerName();
+        String ownerText = owner.isBlank() ? "—" : owner;
+        guiGraphics.drawString(this.font, Component.translatable("gui.logtech.security.owner", ownerText), this.leftPos + 104, this.topPos + 21, 0xBBBBBB, false);
+
+        // Lista de accesos
+        List<CoreSyncPayload.AccessEntryDto> entries = this.menu.getClientAccessEntries();
+        int total = entries.size();
+        int totalPages = Math.max(1, (int) Math.ceil((double) total / 4.0));
+        String pageInfo = (this.accessPage + 1) + "/" + totalPages;
+        guiGraphics.drawString(this.font, pageInfo, this.leftPos + 144, this.topPos + 21, 0x888888, false);
+
+        if (entries.isEmpty()) {
+            guiGraphics.drawString(this.font, Component.translatable("gui.logtech.security.empty_list"), this.leftPos + 12, this.topPos + 55, 0x777777, false);
+        } else {
+            for (int r = 0; r < 4; r++) {
+                int entryIdx = this.accessPage * 4 + r;
+                if (entryIdx < entries.size()) {
+                    int rY = this.topPos + 34 + r * 17;
+                    CoreSyncPayload.AccessEntryDto e = entries.get(entryIdx);
+                    String name = e.name();
+                    if (name.length() > 11) {
+                        name = name.substring(0, 10) + "…";
+                    }
+                    guiGraphics.drawString(this.font, name, this.leftPos + 12, rY + 3, 0xFFFFFF, false);
+                }
+            }
         }
     }
 
@@ -486,7 +764,6 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
                 int rowY = startY + i * 15;
                 int ghostX = this.leftPos + 6;
 
-                // Tooltip de ranura fantasma
                 if (mouseX >= ghostX && mouseX <= ghostX + 16 && mouseY >= rowY && mouseY <= rowY + 16) {
                     CoreSyncPayload.RuleDto r = getRuleDto(i);
                     if (r != null && r.item() != null && !r.item().isEmpty()) {
@@ -497,7 +774,6 @@ public class CoreScreen extends AbstractContainerScreen<CoreMenu> {
                     break;
                 }
 
-                // Tooltip del LED indicador
                 int ledX = this.leftPos + 203;
                 int ledY = rowY + 4;
                 if (mouseX >= ledX && mouseX <= ledX + 5 && mouseY >= ledY && mouseY <= ledY + 5) {

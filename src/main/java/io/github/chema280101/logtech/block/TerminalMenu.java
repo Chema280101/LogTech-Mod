@@ -11,15 +11,23 @@ import io.github.chema280101.logtech.network.NetworkManager;
 import io.github.chema280101.logtech.network.NetworkMember;
 import io.github.chema280101.logtech.network.TerminalActionPayload;
 import io.github.chema280101.logtech.network.TerminalEnergyPayload;
+import io.github.chema280101.logtech.network.TerminalLogPagePayload;
 import io.github.chema280101.logtech.network.TerminalStatsPayload;
 import io.github.chema280101.logtech.network.TerminalSyncPayload;
 import io.github.chema280101.logtech.network.TerminalTabPayload;
+import io.github.chema280101.logtech.network.TerminalTrashPayload;
+import io.github.chema280101.logtech.network.TerminalViewPayload;
+import io.github.chema280101.logtech.network.TerminalViewUpdatePayload;
 import io.github.chema280101.logtech.registry.ModBlocks;
 import io.github.chema280101.logtech.registry.ModMenuTypes;
+import io.github.chema280101.logtech.security.NetworkSecurity;
+import io.github.chema280101.logtech.security.PlayerAction;
 import io.github.chema280101.logtech.storage.ColdOrder;
 import io.github.chema280101.logtech.storage.ColdRetrievalLogic;
 import io.github.chema280101.logtech.storage.ItemKey;
+import io.github.chema280101.logtech.storage.SavedView;
 import io.github.chema280101.logtech.storage.TerminalItemEntry;
+import io.github.chema280101.logtech.storage.TrashEntry;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -60,6 +68,7 @@ public class TerminalMenu extends AbstractContainerMenu {
     private Map<ItemKey, Long> lastSentHotStorage = null;
     private Map<ItemKey, Long> lastSentColdStorage = null;
     private Map<ItemKey, io.github.chema280101.logtech.storage.ItemPinMode> lastSentPolicies = null;
+    private long lastSentRateVersion = -1;
     private int activeTab = TerminalTabPayload.TAB_ITEMS;
     private int statsPacketsSent = 0;
     private int energyPacketsSent = 0;
@@ -76,6 +85,19 @@ public class TerminalMenu extends AbstractContainerMenu {
     private Runnable onStatsUpdatedCallback;
     private TerminalEnergyPayload clientEnergy = null;
     private Runnable onEnergyUpdatedCallback;
+    private List<TerminalTrashPayload.TrashItemEntry> clientTrashEntries = Collections.emptyList();
+    private Runnable onTrashUpdatedCallback;
+    private List<SavedView> clientViews = Collections.emptyList();
+    private Runnable onViewsUpdatedCallback;
+    private boolean clientCanViewLog = false;
+    private int clientLogPage = 0;
+    private int clientTotalLogPages = 1;
+    private int clientTotalLogEntries = 0;
+    private List<TerminalLogPagePayload.LogEntryDto> clientLogEntries = Collections.emptyList();
+    private Runnable onLogUpdatedCallback;
+    private int serverRequestedLogPage = 0;
+    private String serverRequestedLogFilter = "";
+    private boolean viewsDirty = false;
     private ItemStack clientColdItem = ItemStack.EMPTY;
     private int clientColdAmount = 0;
     private int clientColdRemainingTicks = 0;
@@ -124,10 +146,18 @@ public class TerminalMenu extends AbstractContainerMenu {
             reach = 8;
         }
         double maxDistSq = (double) reach * reach;
-        return this.access.evaluate((level, pos) ->
+        boolean inRange = this.access.evaluate((level, pos) ->
                 level.getBlockState(pos).is(ModBlocks.TERMINAL.get())
                         && player.distanceToSqr((double) pos.getX() + 0.5D, (double) pos.getY() + 0.5D, (double) pos.getZ() + 0.5D) <= maxDistSq,
                 true);
+        if (!inRange) return false;
+        if (player instanceof ServerPlayer sp) {
+            CoreBlockEntity coreBe = findCoreBlockEntity(sp);
+            if (coreBe != null && !NetworkSecurity.canPlayerDo(sp, PlayerAction.OPEN_TERMINAL, coreBe)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -161,14 +191,105 @@ public class TerminalMenu extends AbstractContainerMenu {
         if (!stillValid(player)) {
             return;
         }
+        CoreBlockEntity coreBe = getCoreBlockEntity(player);
+        if (coreBe == null) {
+            return;
+        }
         switch (payload.actionType()) {
-            case EXTRACT_STACK -> handleExtractStack(player, payload.item());
-            case EXTRACT_HALF -> handleExtractHalf(player, payload.item());
-            case EXTRACT_SHIFT -> handleExtractShift(player, payload.item());
-            case INSERT_CURSOR_ALL -> handleInsertCursor(player, false);
-            case INSERT_CURSOR_ONE -> handleInsertCursor(player, true);
-            case INSERT_SLOT -> handleInsertSlot(player, payload.slotIndex());
-            case CYCLE_PIN_POLICY -> handleCyclePinPolicy(player, payload.item());
+            case EXTRACT_STACK -> {
+                if (NetworkSecurity.canPlayerDo(player, PlayerAction.EXTRACT_ITEM, coreBe)) {
+                    handleExtractStack(player, payload.item());
+                }
+            }
+            case EXTRACT_HALF -> {
+                if (NetworkSecurity.canPlayerDo(player, PlayerAction.EXTRACT_ITEM, coreBe)) {
+                    handleExtractHalf(player, payload.item());
+                }
+            }
+            case EXTRACT_SHIFT -> {
+                if (NetworkSecurity.canPlayerDo(player, PlayerAction.EXTRACT_ITEM, coreBe)) {
+                    handleExtractShift(player, payload.item());
+                }
+            }
+            case INSERT_CURSOR_ALL -> {
+                if (NetworkSecurity.canPlayerDo(player, PlayerAction.INSERT_ITEM, coreBe)) {
+                    handleInsertCursor(player, false);
+                }
+            }
+            case INSERT_CURSOR_ONE -> {
+                if (NetworkSecurity.canPlayerDo(player, PlayerAction.INSERT_ITEM, coreBe)) {
+                    handleInsertCursor(player, true);
+                }
+            }
+            case INSERT_SLOT -> {
+                if (NetworkSecurity.canPlayerDo(player, PlayerAction.INSERT_ITEM, coreBe)) {
+                    handleInsertSlot(player, payload.slotIndex());
+                }
+            }
+            case CYCLE_PIN_POLICY -> {
+                if (NetworkSecurity.canPlayerDo(player, PlayerAction.PIN_TIER, coreBe)) {
+                    handleCyclePinPolicy(player, payload.item());
+                }
+            }
+            case DESTROY_CURSOR -> {
+                if (NetworkSecurity.canPlayerDo(player, PlayerAction.TRASH_ITEM, coreBe)) {
+                    handleDestroyCursor(player);
+                }
+            }
+            case RESTORE_TRASH -> {
+                if (NetworkSecurity.canPlayerDo(player, PlayerAction.RESTORE_ITEM, coreBe)) {
+                    handleRestoreTrash(player, payload.item(), payload.slotIndex() == 1);
+                }
+            }
+        }
+    }
+
+    private void handleDestroyCursor(ServerPlayer player) {
+        ItemStack carried = this.getCarried();
+        if (carried.isEmpty()) {
+            return;
+        }
+        CoreBlockEntity coreBe = getCoreBlockEntity(player);
+        if (coreBe == null) {
+            return;
+        }
+        ItemKey key = ItemKey.of(carried);
+        long count = carried.getCount();
+        coreBe.getTrashBin().add(key, count, player.serverLevel().getGameTime(), coreBe.getTrashCapacity());
+        coreBe.logActivity(player, io.github.chema280101.logtech.security.ActivityAction.DESTROY, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString(), count);
+        this.setCarried(ItemStack.EMPTY);
+        this.broadcastChanges();
+        coreBe.setChanged();
+        sendTrashSync();
+        triggerImmediateSync();
+    }
+
+    private void handleRestoreTrash(ServerPlayer player, ItemStack targetItem, boolean shiftClick) {
+        if (targetItem == null || targetItem.isEmpty()) {
+            return;
+        }
+        CoreBlockEntity coreBe = getCoreBlockEntity(player);
+        if (coreBe == null) {
+            return;
+        }
+        ItemKey key = ItemKey.of(targetItem);
+        long inTrash = coreBe.getTrashBin().getAmount(key);
+        if (inTrash <= 0) {
+            return;
+        }
+        long desired = shiftClick ? inTrash : Math.min(inTrash, targetItem.getMaxStackSize());
+        long canInsert = coreBe.insert(key, desired, true);
+        if (canInsert <= 0) {
+            // Si no hay espacio en la red, se queda en la papelera
+            return;
+        }
+        long inserted = coreBe.insert(key, canInsert, false);
+        if (inserted > 0) {
+            coreBe.getTrashBin().restore(key, inserted);
+            coreBe.logActivity(player, io.github.chema280101.logtech.security.ActivityAction.RESTORE, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString(), inserted);
+            coreBe.setChanged();
+            sendTrashSync();
+            triggerImmediateSync();
         }
     }
 
@@ -185,17 +306,14 @@ public class TerminalMenu extends AbstractContainerMenu {
         triggerImmediateSync();
     }
 
-    private CoreBlockEntity getCoreBlockEntity(ServerPlayer player) {
-        if (!stillValid(player)) {
-            return null;
-        }
+    public CoreBlockEntity findCoreBlockEntity(ServerPlayer player) {
         Level level = player.serverLevel();
         NetworkManager manager = NetworkManager.get(level);
         if (manager == null) {
             return null;
         }
         Network network = manager.scan(this.pos, null);
-        if (!network.isValid()) {
+        if (!network.isValid() || network.getCores().isEmpty()) {
             return null;
         }
         BlockPos corePos = network.getCores().iterator().next();
@@ -203,7 +321,15 @@ public class TerminalMenu extends AbstractContainerMenu {
             return null;
         }
         BlockEntity be = level.getBlockEntity(corePos);
-        return be instanceof CoreBlockEntity coreBe && coreBe.isPowered() ? coreBe : null;
+        return be instanceof CoreBlockEntity coreBe ? coreBe : null;
+    }
+
+    public CoreBlockEntity getCoreBlockEntity(ServerPlayer player) {
+        if (!stillValid(player)) {
+            return null;
+        }
+        CoreBlockEntity coreBe = findCoreBlockEntity(player);
+        return coreBe != null && coreBe.isPowered() ? coreBe : null;
     }
 
     private void handleExtractStack(ServerPlayer player, ItemStack targetItem) {
@@ -232,6 +358,7 @@ public class TerminalMenu extends AbstractContainerMenu {
         if (hotToExtract > 0) {
             actuallyExtracted = coreBe.extractHot(key, hotToExtract, false);
             if (actuallyExtracted > 0) {
+                coreBe.logActivity(player, io.github.chema280101.logtech.security.ActivityAction.EXTRACT, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString(), actuallyExtracted);
                 this.setCarried(key.toStack((int) actuallyExtracted));
                 this.broadcastChanges();
                 triggerImmediateSync();
@@ -274,6 +401,7 @@ public class TerminalMenu extends AbstractContainerMenu {
         if (hotToExtract > 0) {
             actuallyExtracted = coreBe.extractHot(key, hotToExtract, false);
             if (actuallyExtracted > 0) {
+                coreBe.logActivity(player, io.github.chema280101.logtech.security.ActivityAction.EXTRACT, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString(), actuallyExtracted);
                 this.setCarried(key.toStack((int) actuallyExtracted));
                 this.broadcastChanges();
                 triggerImmediateSync();
@@ -320,8 +448,13 @@ public class TerminalMenu extends AbstractContainerMenu {
             if (actuallyExtracted > 0) {
                 ItemStack toMove = key.toStack((int) actuallyExtracted);
                 this.moveItemStackTo(toMove, 0, 36, false);
+                long netMoved = actuallyExtracted;
                 if (!toMove.isEmpty()) {
                     coreBe.insert(key, toMove.getCount(), false);
+                    netMoved -= toMove.getCount();
+                }
+                if (netMoved > 0) {
+                    coreBe.logActivity(player, io.github.chema280101.logtech.security.ActivityAction.EXTRACT, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString(), netMoved);
                 }
                 this.broadcastChanges();
                 triggerImmediateSync();
@@ -365,6 +498,7 @@ public class TerminalMenu extends AbstractContainerMenu {
         long toInsert = oneOnly ? 1 : carried.getCount();
         long inserted = coreBe.insert(key, toInsert, false);
         if (inserted > 0) {
+            coreBe.logActivity(player, io.github.chema280101.logtech.security.ActivityAction.INSERT, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString(), inserted);
             carried.shrink((int) inserted);
             this.setCarried(carried);
             this.broadcastChanges();
@@ -388,6 +522,7 @@ public class TerminalMenu extends AbstractContainerMenu {
         ItemKey key = ItemKey.of(slotStack);
         long inserted = coreBe.insert(key, slotStack.getCount(), false);
         if (inserted > 0) {
+            coreBe.logActivity(player, io.github.chema280101.logtech.security.ActivityAction.INSERT, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString(), inserted);
             slotStack.shrink((int) inserted);
             if (slotStack.isEmpty()) {
                 slot.setByPlayer(ItemStack.EMPTY);
@@ -444,6 +579,7 @@ public class TerminalMenu extends AbstractContainerMenu {
         this.lastSentHotStorage = new HashMap<>(coreBe.getTierStorage(io.github.chema280101.logtech.storage.StorageTier.HOT).getAll());
         this.lastSentColdStorage = new HashMap<>(coreBe.getTierStorage(io.github.chema280101.logtech.storage.StorageTier.COLD).getAll());
         sendFullSync(coreBe);
+        sendViewSync();
     }
 
     @Override
@@ -460,6 +596,8 @@ public class TerminalMenu extends AbstractContainerMenu {
             String tabName = switch (tab) {
                 case TerminalTabPayload.TAB_STATS -> "ESTADÍSTICAS";
                 case TerminalTabPayload.TAB_ENERGY -> "ENERGÍA";
+                case TerminalTabPayload.TAB_TRASH -> "PAPELERA";
+                case TerminalTabPayload.TAB_LOG -> "REGISTRO";
                 default -> "ÍTEMS";
             };
             LOGGER.info("[LogTech TabSync] Jugador {} cambió pestaña a: {}",
@@ -469,6 +607,10 @@ public class TerminalMenu extends AbstractContainerMenu {
             sendStatsSync();
         } else if (tab == TerminalTabPayload.TAB_ENERGY) {
             sendEnergySync();
+        } else if (tab == TerminalTabPayload.TAB_TRASH) {
+            sendTrashSync();
+        } else if (tab == TerminalTabPayload.TAB_LOG) {
+            sendLogSync();
         }
     }
 
@@ -513,6 +655,16 @@ public class TerminalMenu extends AbstractContainerMenu {
             sendStatsSync();
         } else if (this.activeTab == TerminalTabPayload.TAB_ENERGY && (statsInterval <= 1 || this.tickCounter % statsInterval == 0)) {
             sendEnergySync();
+        } else if (this.activeTab == TerminalTabPayload.TAB_TRASH && (this.tickCounter % 20 == 0)) {
+            sendTrashSync();
+        } else if (this.activeTab == TerminalTabPayload.TAB_LOG && (this.tickCounter % 20 == 0)) {
+            sendLogSync();
+        }
+
+        // Sincronizar vistas cuando han cambiado (p. ej. tras save/rename/delete)
+        if (this.viewsDirty) {
+            this.viewsDirty = false;
+            sendViewSync();
         }
 
         // Sincronizar en el primer tick y cada 10 ticks (0.5 segundos) solo si cambió algo
@@ -567,15 +719,18 @@ public class TerminalMenu extends AbstractContainerMenu {
         Map<ItemKey, Long> hotStorage = coreBe.getTierStorage(io.github.chema280101.logtech.storage.StorageTier.HOT).getAll();
         Map<ItemKey, Long> coldStorage = coreBe.getTierStorage(io.github.chema280101.logtech.storage.StorageTier.COLD).getAll();
         Map<ItemKey, io.github.chema280101.logtech.storage.ItemPinMode> policies = coreBe.getPolicyManager().getPinnedPolicies();
+        long rateVersion = coreBe.getRateTracker().getVersion();
         if (!this.lastSentValid || !this.lastSentPowered
                 || !hotStorage.equals(this.lastSentHotStorage)
                 || !coldStorage.equals(this.lastSentColdStorage)
-                || !policies.equals(this.lastSentPolicies)) {
+                || !policies.equals(this.lastSentPolicies)
+                || rateVersion != this.lastSentRateVersion) {
             this.lastSentValid = true;
             this.lastSentPowered = true;
             this.lastSentHotStorage = new HashMap<>(hotStorage);
             this.lastSentColdStorage = new HashMap<>(coldStorage);
             this.lastSentPolicies = new HashMap<>(policies);
+            this.lastSentRateVersion = rateVersion;
             sendFullSync(coreBe);
         }
     }
@@ -588,7 +743,8 @@ public class TerminalMenu extends AbstractContainerMenu {
             long hotAmount = coreBe.getAmount(entry.getKey(), io.github.chema280101.logtech.storage.StorageTier.HOT);
             long coldAmount = coreBe.getAmount(entry.getKey(), io.github.chema280101.logtech.storage.StorageTier.COLD);
             io.github.chema280101.logtech.storage.ItemPinMode pinMode = coreBe.getPinMode(entry.getKey());
-            entries.add(new TerminalItemEntry(stack, entry.getValue(), hotAmount, coldAmount, pinMode));
+            long rate = coreBe.getRateTracker().getItemRate(entry.getKey());
+            entries.add(new TerminalItemEntry(stack, entry.getValue(), hotAmount, coldAmount, pinMode, rate));
         }
 
         // Ordenar por cantidad descendente, luego nombre alfabético
@@ -600,10 +756,13 @@ public class TerminalMenu extends AbstractContainerMenu {
             return a.stack().getHoverName().getString().compareToIgnoreCase(b.stack().getHoverName().getString());
         });
 
+        boolean canViewLog = coreBe.isActivityLogEnabled()
+                && NetworkSecurity.canPlayerDo(this.serverPlayer, PlayerAction.VIEW_LOG, coreBe);
+
         if (entries.isEmpty()) {
             PacketDistributor.sendToPlayer(
                     this.serverPlayer,
-                    new TerminalSyncPayload(this.containerId, true, true, 0, 1, Collections.emptyList())
+                    new TerminalSyncPayload(this.containerId, true, true, 0, 1, Collections.emptyList(), canViewLog)
             );
             return;
         }
@@ -615,8 +774,222 @@ public class TerminalMenu extends AbstractContainerMenu {
             List<TerminalItemEntry> batch = entries.subList(from, to);
             PacketDistributor.sendToPlayer(
                     this.serverPlayer,
-                    new TerminalSyncPayload(this.containerId, true, true, i, totalBatches, batch)
+                    new TerminalSyncPayload(this.containerId, true, true, i, totalBatches, batch, canViewLog)
             );
+        }
+    }
+
+    public void sendTrashSync() {
+        if (this.serverPlayer == null || this.serverPlayer.level().isClientSide()) {
+            return;
+        }
+        CoreBlockEntity coreBe = getCoreBlockEntity(this.serverPlayer);
+        if (coreBe == null) {
+            PacketDistributor.sendToPlayer(
+                    this.serverPlayer,
+                    new TerminalTrashPayload(this.containerId, Collections.emptyList())
+            );
+            return;
+        }
+        long currentGameTime = this.serverPlayer.serverLevel().getGameTime();
+        long lifetime = coreBe.getTrashLifetimeTicks();
+        List<TerminalTrashPayload.TrashItemEntry> entries = new ArrayList<>();
+        for (Map.Entry<ItemKey, TrashEntry<ItemKey>> e : coreBe.getTrashBin().getEntries().entrySet()) {
+            TrashEntry<ItemKey> te = e.getValue();
+            if (te != null && te.amount() > 0) {
+                long ticksRemaining = Math.max(0L, lifetime - (currentGameTime - te.gameTime()));
+                ItemStack stack = te.item().toStack(1);
+                entries.add(new TerminalTrashPayload.TrashItemEntry(stack, te.amount(), te.gameTime(), ticksRemaining));
+            }
+        }
+        PacketDistributor.sendToPlayer(
+                this.serverPlayer,
+                new TerminalTrashPayload(this.containerId, entries)
+        );
+    }
+
+    public void setOnTrashUpdatedCallback(Runnable callback) {
+        this.onTrashUpdatedCallback = callback;
+    }
+
+    public List<TerminalTrashPayload.TrashItemEntry> getClientTrashEntries() {
+        return this.clientTrashEntries;
+    }
+
+    public void receiveTrashSync(List<TerminalTrashPayload.TrashItemEntry> entries) {
+        this.clientTrashEntries = entries != null ? entries : Collections.emptyList();
+        if (this.onTrashUpdatedCallback != null) {
+            this.onTrashUpdatedCallback.run();
+        }
+    }
+
+    // ── Registro de actividad ──────────────────────────────────────────────────────────
+
+    public void setOnLogUpdatedCallback(Runnable callback) {
+        this.onLogUpdatedCallback = callback;
+    }
+
+    public int getClientLogPage() {
+        return this.clientLogPage;
+    }
+
+    public int getClientTotalLogPages() {
+        return this.clientTotalLogPages;
+    }
+
+    public int getClientTotalLogEntries() {
+        return this.clientTotalLogEntries;
+    }
+
+    public List<TerminalLogPagePayload.LogEntryDto> getClientLogEntries() {
+        return this.clientLogEntries;
+    }
+
+    public void receiveLogPage(int pageIndex, int totalPages, int totalEntries, List<TerminalLogPagePayload.LogEntryDto> entries) {
+        this.clientLogPage = pageIndex;
+        this.clientTotalLogPages = Math.max(1, totalPages);
+        this.clientTotalLogEntries = totalEntries;
+        this.clientLogEntries = (entries != null) ? entries : Collections.emptyList();
+        if (this.onLogUpdatedCallback != null) {
+            this.onLogUpdatedCallback.run();
+        }
+    }
+
+    public void handleLogRequest(int pageIndex, String playerFilter) {
+        if (this.serverPlayer == null || this.serverPlayer.level().isClientSide()) {
+            return;
+        }
+        CoreBlockEntity coreBe = getCoreBlockEntity(this.serverPlayer);
+        if (coreBe == null || !coreBe.isActivityLogEnabled() || !NetworkSecurity.canPlayerDo(this.serverPlayer, PlayerAction.VIEW_LOG, coreBe)) {
+            return;
+        }
+        this.serverRequestedLogPage = Math.max(0, pageIndex);
+        this.serverRequestedLogFilter = (playerFilter != null) ? playerFilter : "";
+        sendLogSync();
+    }
+
+    public void sendLogSync() {
+        if (this.serverPlayer == null || this.serverPlayer.level().isClientSide()) {
+            return;
+        }
+        CoreBlockEntity coreBe = getCoreBlockEntity(this.serverPlayer);
+        if (coreBe == null || !coreBe.isActivityLogEnabled() || !NetworkSecurity.canPlayerDo(this.serverPlayer, PlayerAction.VIEW_LOG, coreBe)) {
+            PacketDistributor.sendToPlayer(
+                    this.serverPlayer,
+                    new TerminalLogPagePayload(this.containerId, 0, 1, 0, Collections.emptyList())
+            );
+            return;
+        }
+
+        io.github.chema280101.logtech.security.ActivityLogBuffer.PageResult<String> result =
+                coreBe.getActivityLog().getPage(this.serverRequestedLogPage, 10, this.serverRequestedLogFilter, true);
+
+        List<TerminalLogPagePayload.LogEntryDto> dtos = new ArrayList<>(result.entries().size());
+        for (io.github.chema280101.logtech.security.ActivityLogEntry<String> e : result.entries()) {
+            dtos.add(new TerminalLogPagePayload.LogEntryDto(
+                    e.gameTime(),
+                    e.playerUuid(),
+                    e.playerName(),
+                    e.action(),
+                    e.item() != null ? e.item() : "",
+                    e.amount()
+            ));
+        }
+
+        PacketDistributor.sendToPlayer(
+                this.serverPlayer,
+                new TerminalLogPagePayload(
+                        this.containerId,
+                        result.pageIndex(),
+                        result.totalPages(),
+                        result.totalMatchingEntries(),
+                        dtos
+                )
+        );
+    }
+
+    // ── Vistas guardadas ────────────────────────────────────────────────────────────────
+
+    public void setOnViewsUpdatedCallback(Runnable callback) {
+        this.onViewsUpdatedCallback = callback;
+    }
+
+    public List<SavedView> getClientViews() {
+        return this.clientViews;
+    }
+
+    /** Recibe la lista de vistas desde el servidor (cliente). */
+    public void receiveViewSync(List<SavedView> views) {
+        this.clientViews = views != null ? java.util.Collections.unmodifiableList(new java.util.ArrayList<>(views)) : Collections.emptyList();
+        if (this.onViewsUpdatedCallback != null) {
+            this.onViewsUpdatedCallback.run();
+        }
+    }
+
+    /** Envía las vistas actuales del Núcleo al jugador (servidor). */
+    public void sendViewSync() {
+        if (this.serverPlayer == null || this.serverPlayer.level().isClientSide()) return;
+        CoreBlockEntity coreBe = getCoreBlockEntity(this.serverPlayer);
+        if (coreBe == null) {
+            PacketDistributor.sendToPlayer(
+                    this.serverPlayer,
+                    new TerminalViewPayload(this.containerId, Collections.nCopies(io.github.chema280101.logtech.storage.ViewManager.MAX_VIEWS, null))
+            );
+            return;
+        }
+        PacketDistributor.sendToPlayer(
+                this.serverPlayer,
+                new TerminalViewPayload(this.containerId, coreBe.getViewManager().getAll())
+        );
+    }
+
+    /**
+     * Procesa una solicitud de actualización de vistas del cliente.
+     * Valida permisos y sanea los datos antes de modificar el ViewManager.
+     */
+    public void handleViewUpdate(ServerPlayer player, TerminalViewUpdatePayload payload) {
+        if (!stillValid(player)) return;
+        CoreBlockEntity coreBe = getCoreBlockEntity(player);
+        if (coreBe == null) return;
+        if (!NetworkSecurity.canPlayerDo(player, PlayerAction.MANAGE_VIEWS, coreBe)) return;
+
+        int index = payload.index();
+        if (index < 0 || index >= coreBe.getMaxSavedViews()) return;
+
+        io.github.chema280101.logtech.storage.ViewManager vm = coreBe.getViewManager();
+        boolean changed = false;
+
+        switch (payload.action()) {
+            case SAVE -> {
+                SavedView incoming = payload.view();
+                if (incoming == null) return;
+                // Doble sanitización en servidor
+                String safeName = SavedView.sanitizeName(incoming.name());
+                if (safeName == null) return;
+                SavedView safe = new SavedView(
+                        safeName,
+                        SavedView.sanitizeSearch(incoming.searchText()),
+                        incoming.sortMode(),
+                        incoming.tierFilter(),
+                        incoming.minPurity()
+                );
+                changed = vm.save(index, safe, coreBe.getMaxSavedViews());
+            }
+            case RENAME -> {
+                SavedView incoming = payload.view();
+                if (incoming == null) return;
+                String safeName = SavedView.sanitizeName(incoming.name());
+                if (safeName == null) return;
+                changed = vm.rename(index, safeName);
+            }
+            case DELETE -> {
+                changed = vm.delete(index);
+            }
+        }
+
+        if (changed) {
+            coreBe.setChanged();
+            this.viewsDirty = true;
         }
     }
 
@@ -635,7 +1008,8 @@ public class TerminalMenu extends AbstractContainerMenu {
                             this.containerId,
                             0L, 0L, 0, 0.0f, 0, 0, 0,
                             new int[60],
-                            Collections.emptyList()
+                            Collections.emptyList(),
+                            0L
                     )
             );
             return;
@@ -668,10 +1042,13 @@ public class TerminalMenu extends AbstractContainerMenu {
         List<TerminalStatsPayload.MachineStatEntry> machineEntries = new ArrayList<>();
         for (NetworkMember member : members) {
             int mItemsPerMin = Math.max(member.getActivityCounter().getItemsOut(1), member.getActivityCounter().getItemsIn(1));
+            int mHeat = (int) Math.round(member.getHeat());
             machineEntries.add(new TerminalStatsPayload.MachineStatEntry(
                     member.getName(),
                     member.getStatus(),
-                    mItemsPerMin
+                    mItemsPerMin,
+                    mHeat,
+                    member.getFirmwareType()
             ));
         }
 
@@ -689,6 +1066,15 @@ public class TerminalMenu extends AbstractContainerMenu {
         LOGGER.info("[LogTech StatsSync] Enviando estadísticas a {} (paquetes enviados: {})",
                 this.serverPlayer.getScoreboardName(), this.statsPacketsSent);
 
+        long hotUsed = coreBe.getTotalStored(io.github.chema280101.logtech.storage.StorageTier.HOT);
+        long hotCap = coreBe.getCapacity(io.github.chema280101.logtech.storage.StorageTier.HOT);
+        long coldUsed = coreBe.getTotalStored(io.github.chema280101.logtech.storage.StorageTier.COLD);
+        long coldCap = coreBe.getCapacity(io.github.chema280101.logtech.storage.StorageTier.COLD);
+
+        long hotRate = coreBe.getRateTracker().getHotNetRate();
+        long coldRate = coreBe.getRateTracker().getColdNetRate();
+        long totalRate = coreBe.getRateTracker().getTotalNetRate();
+
         PacketDistributor.sendToPlayer(
                 this.serverPlayer,
                 new TerminalStatsPayload(
@@ -701,7 +1087,15 @@ public class TerminalMenu extends AbstractContainerMenu {
                         energyCapacity,
                         energyConsumption,
                         hourlyHistory,
-                        machineEntries
+                        machineEntries,
+                        coreBe.getQuarantineCount(),
+                        hotUsed,
+                        hotCap,
+                        coldUsed,
+                        coldCap,
+                        hotRate,
+                        coldRate,
+                        totalRate
                 )
         );
     }
@@ -823,6 +1217,10 @@ public class TerminalMenu extends AbstractContainerMenu {
         if (!stillValid(player) || machinePos == null || newPriority == null) {
             return;
         }
+        CoreBlockEntity coreBe = getCoreBlockEntity(player);
+        if (coreBe == null || !NetworkSecurity.canPlayerDo(player, PlayerAction.CHANGE_PRIORITY, coreBe)) {
+            return;
+        }
         Level level = player.serverLevel();
         NetworkManager manager = NetworkManager.get(level);
         Network network = manager != null ? manager.scan(this.pos, null) : Network.EMPTY;
@@ -853,7 +1251,7 @@ public class TerminalMenu extends AbstractContainerMenu {
         this.onEnergyUpdatedCallback = callback;
     }
 
-    public void receiveSync(boolean networkValid, boolean powered, int batchIndex, int totalBatches, List<TerminalItemEntry> items) {
+    public void receiveSync(boolean networkValid, boolean powered, int batchIndex, int totalBatches, List<TerminalItemEntry> items, boolean canViewLog) {
         if (batchIndex == 0) {
             this.incomingBatchAccumulator.clear();
         }
@@ -862,10 +1260,19 @@ public class TerminalMenu extends AbstractContainerMenu {
             this.clientItems = new ArrayList<>(this.incomingBatchAccumulator);
             this.clientNetworkValid = networkValid;
             this.clientPowered = powered;
+            this.clientCanViewLog = canViewLog;
             if (this.onItemsUpdatedCallback != null) {
                 this.onItemsUpdatedCallback.run();
             }
         }
+    }
+
+    public void receiveSync(boolean networkValid, boolean powered, int batchIndex, int totalBatches, List<TerminalItemEntry> items) {
+        receiveSync(networkValid, powered, batchIndex, totalBatches, items, false);
+    }
+
+    public boolean canClientViewLog() {
+        return this.clientCanViewLog;
     }
 
     public void receiveStats(TerminalStatsPayload stats) {
@@ -928,8 +1335,13 @@ public class TerminalMenu extends AbstractContainerMenu {
                 if (extracted > 0) {
                     ItemStack delivered = key.toStack((int) extracted);
                     this.moveItemStackTo(delivered, 0, 36, false);
+                    long netMoved = extracted;
                     if (!delivered.isEmpty()) {
                         coreBe.insert(key, delivered.getCount(), false);
+                        netMoved -= delivered.getCount();
+                    }
+                    if (netMoved > 0) {
+                        coreBe.logActivity(this.serverPlayer, io.github.chema280101.logtech.security.ActivityAction.EXTRACT, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString(), netMoved);
                     }
                     this.broadcastChanges();
                     triggerImmediateSync();
@@ -993,8 +1405,13 @@ public class TerminalMenu extends AbstractContainerMenu {
                 if (extracted > 0) {
                     ItemStack deliveredStack = key.toStack((int) extracted);
                     this.moveItemStackTo(deliveredStack, 0, 36, false);
+                    long netMoved = extracted;
                     if (!deliveredStack.isEmpty()) {
                         coreBe.insert(key, deliveredStack.getCount(), false);
+                        netMoved -= deliveredStack.getCount();
+                    }
+                    if (netMoved > 0) {
+                        coreBe.logActivity(this.serverPlayer, io.github.chema280101.logtech.security.ActivityAction.EXTRACT, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString(), netMoved);
                     }
                     this.broadcastChanges();
                     triggerImmediateSync();

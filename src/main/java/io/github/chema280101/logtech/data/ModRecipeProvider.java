@@ -326,5 +326,71 @@ public class ModRecipeProvider extends RecipeProvider {
                 .purityMode(PurityMode.INCREASE)
                 .unlockedBy("has_crystalite_dust", has(ModItems.CRYSTALITE_DUST.get()))
                 .save(recipeOutput, modLoc("washing/crystalite_dust"));
+
+        // 15. Disipador térmico (x1) - Refrigeración pasiva para máquinas
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.HEATSINK.get(), 1)
+                .pattern("BBB")
+                .pattern("NNN")
+                .pattern("III")
+                .define('B', Items.IRON_BARS)
+                .define('N', ModItems.NEOFERRITE_INGOT.get())
+                .define('I', Items.IRON_INGOT)
+                .unlockedBy("has_neoferrite_ingot", has(ModItems.NEOFERRITE_INGOT.get()))
+                .save(recipeOutput, modLoc("heatsink"));
+
+        // 16. Firmware Chips (x1) - Chips de optimización y comportamiento
+        // 16a. Firmware Eco
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.FIRMWARE_ECO.get(), 1)
+                .pattern(" S ")
+                .pattern("SCS")
+                .pattern(" S ")
+                .define('S', ModItems.CRYSTAL_SHARD.get())
+                .define('C', ModItems.DATA_CRYSTAL.get())
+                .unlockedBy("has_data_crystal", has(ModItems.DATA_CRYSTAL.get()))
+                .save(recipeOutput, modLoc("firmware_eco"));
+
+        // 16b. Firmware Turbo
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.FIRMWARE_TURBO.get(), 1)
+                .pattern(" R ")
+                .pattern("SCS")
+                .pattern(" R ")
+                .define('R', Items.REDSTONE)
+                .define('S', ModItems.CRYSTAL_SHARD.get())
+                .define('C', ModItems.DATA_CRYSTAL.get())
+                .unlockedBy("has_data_crystal", has(ModItems.DATA_CRYSTAL.get()))
+                .save(recipeOutput, modLoc("firmware_turbo"));
+
+        // 16c. Firmware Seguro
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.FIRMWARE_SAFE.get(), 1)
+                .pattern(" I ")
+                .pattern("SCS")
+                .pattern(" I ")
+                .define('I', Items.IRON_INGOT)
+                .define('S', ModItems.CRYSTAL_SHARD.get())
+                .define('C', ModItems.DATA_CRYSTAL.get())
+                .unlockedBy("has_data_crystal", has(ModItems.DATA_CRYSTAL.get()))
+                .save(recipeOutput, modLoc("firmware_safe"));
+
+        // 16d. Firmware Selectivo
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.FIRMWARE_SELECTIVE.get(), 1)
+                .pattern(" H ")
+                .pattern("SCS")
+                .pattern(" H ")
+                .define('H', Items.HOPPER)
+                .define('S', ModItems.CRYSTAL_SHARD.get())
+                .define('C', ModItems.DATA_CRYSTAL.get())
+                .unlockedBy("has_data_crystal", has(ModItems.DATA_CRYSTAL.get()))
+                .save(recipeOutput, modLoc("firmware_selective"));
+
+        // 17. Llave de configuración
+        ShapedRecipeBuilder.shaped(RecipeCategory.TOOLS, ModItems.CONFIG_KEY.get(), 1)
+                .pattern("  I")
+                .pattern(" R ")
+                .pattern("N  ")
+                .define('I', Items.IRON_INGOT)
+                .define('R', Items.REDSTONE)
+                .define('N', ModItems.NEOFERRITE_INGOT.get())
+                .unlockedBy("has_neoferrite_ingot", has(ModItems.NEOFERRITE_INGOT.get()))
+                .save(recipeOutput, modLoc("config_key"));
     }
 }

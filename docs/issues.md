@@ -33,9 +33,12 @@ Registro formal de issues y limitaciones identificadas en la versión alpha v0.1
 ### Issue #4: [Art / Assets] Refinamiento de texturas y modelos 3D
 - **Tipo:** Arte y recursos visuales
 - **Severidad:** Baja (estético)
-- **Estado:** Abierto
-- **Descripción:** Los sprites e iconos actuales son funcionales y de resolución 16x16 base.
-- **Plan:** Mejorar los detalles visuales de los modelos, animaciones y texturas a lo largo de las versiones v0.2 y v0.3.
+- **Estado:** Cerrado / Resuelto en v0.3
+- **Descripción:** Los sprites de minerales usaban provisionalmente el icono base del módulo de datos, y las máquinas y bloques de almacenamiento compartían una sola textura repetida en todas sus caras (`cubeAll`).
+- **Resolución:**
+  1. Diseñados sprites 16x16 pixel-art dedicados y fieles a la estética de Minecraft vanilla para todos los minerales brutos (`raw_neoferrite`, `raw_crystalite`), polvos triturados (`neoferrite_dust`, `crystalite_dust`), lingote de neoferrita (`neoferrite_ingot`) y cristal de datos (`data_crystal`).
+  2. Implementada orientación horizontal (`FACING`) en `CoreBlock`, `RackBlock`, `TerminalBlock`, `CrusherBlock`, `WasherBlock`, `CentrifugeBlock`, `CoalGeneratorBlock` y `DrillBlock`, haciendo que las máquinas miren automáticamente hacia el jugador al colocarse.
+  3. Generados modelos 3D orientables (`orientable_with_bottom`) con caras diferenciadas: chasis lateral reforzado, base pesada, panel superior especializado (tolva, chimenea, turbina, visor) y frontal distintivo con pantallas, mandíbulas, bahías y cámaras de fluidos, incluyendo estados activos con fuego y movimiento.
 
 ---
 

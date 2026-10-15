@@ -47,6 +47,12 @@ public class CoreMenu extends AbstractContainerMenu {
     private long clientColdCapacity = 0L;
     private List<CoreSyncPayload.MachineInfo> clientMachines = Collections.emptyList();
     private List<CoreSyncPayload.RuleDto> clientRules = Collections.emptyList();
+    private boolean clientCanAdmin = false;
+    private boolean clientIsClaimable = false;
+    private String clientOwnerName = "";
+    private int clientSecurityModeOrdinal = 0;
+    private List<CoreSyncPayload.AccessEntryDto> clientAccessEntries = Collections.emptyList();
+    private List<CoreSyncPayload.OnlinePlayerDto> clientOnlinePlayers = Collections.emptyList();
     private Runnable onSyncCallback = null;
 
     public CoreMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buf) {
@@ -98,10 +104,18 @@ public class CoreMenu extends AbstractContainerMenu {
             reach = 8;
         }
         double maxDistSq = (double) reach * reach;
-        return this.access.evaluate((level, pos) ->
+        boolean inRange = this.access.evaluate((level, pos) ->
                 level.getBlockState(pos).is(ModBlocks.CORE.get())
                         && player.distanceToSqr((double) pos.getX() + 0.5D, (double) pos.getY() + 0.5D, (double) pos.getZ() + 0.5D) <= maxDistSq,
                 true);
+        if (!inRange) return false;
+        if (player instanceof ServerPlayer sp) {
+            CoreBlockEntity coreBe = getCoreBlockEntity(sp);
+            if (coreBe != null && !io.github.chema280101.logtech.security.NetworkSecurity.canPlayerDo(sp, io.github.chema280101.logtech.security.PlayerAction.OPEN_CORE, coreBe)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -144,7 +158,7 @@ public class CoreMenu extends AbstractContainerMenu {
         }
     }
 
-    private CoreBlockEntity getCoreBlockEntity(ServerPlayer player) {
+    public CoreBlockEntity getCoreBlockEntity(ServerPlayer player) {
         Level level = player.level();
         if (level == null || !level.hasChunkAt(pos)) {
             return null;
@@ -206,6 +220,32 @@ public class CoreMenu extends AbstractContainerMenu {
             }
         }
 
+        boolean canAdmin = io.github.chema280101.logtech.security.NetworkSecurity.canPlayerDo(this.serverPlayer, io.github.chema280101.logtech.security.PlayerAction.MANAGE_ACCESS, coreBe);
+        boolean isClaimable = !coreBe.getSecurityManager().hasOwner();
+        String ownerName = coreBe.getSecurityManager().getOwnerName();
+        int secMode = coreBe.getSecurityManager().getMode().ordinal();
+
+        List<CoreSyncPayload.AccessEntryDto> accessEntries = new ArrayList<>();
+        for (io.github.chema280101.logtech.security.PlayerAccessEntry e : coreBe.getSecurityManager().getEntryList()) {
+            accessEntries.add(new CoreSyncPayload.AccessEntryDto(
+                    e.getPlayerUuid(),
+                    e.getLastKnownName(),
+                    e.canView(),
+                    e.canExtract(),
+                    e.canInsert(),
+                    e.canAdmin()
+            ));
+        }
+
+        List<CoreSyncPayload.OnlinePlayerDto> onlinePlayers = new ArrayList<>();
+        if (this.serverPlayer != null && this.serverPlayer.getServer() != null) {
+            for (ServerPlayer sp : this.serverPlayer.getServer().getPlayerList().getPlayers()) {
+                if (!coreBe.getSecurityManager().isOwner(sp.getUUID()) && coreBe.getSecurityManager().getEntry(sp.getUUID()) == null) {
+                    onlinePlayers.add(new CoreSyncPayload.OnlinePlayerDto(sp.getUUID(), sp.getName().getString()));
+                }
+            }
+        }
+
         PacketDistributor.sendToPlayer(
                 this.serverPlayer,
                 new CoreSyncPayload(
@@ -222,9 +262,24 @@ public class CoreMenu extends AbstractContainerMenu {
                         coldStored,
                         coldCapacity,
                         machineInfos,
-                        ruleDtos
+                        ruleDtos,
+                        canAdmin,
+                        isClaimable,
+                        ownerName,
+                        secMode,
+                        accessEntries,
+                        onlinePlayers
                 )
         );
+    }
+
+    public void triggerImmediateSync() {
+        if (this.serverPlayer != null) {
+            CoreBlockEntity coreBe = getCoreBlockEntity(this.serverPlayer);
+            if (coreBe != null) {
+                sendFullSync(coreBe);
+            }
+        }
     }
 
     public void handleRuleUpdate(CoreRuleUpdatePayload payload) {
@@ -233,6 +288,9 @@ public class CoreMenu extends AbstractContainerMenu {
         }
         CoreBlockEntity coreBe = getCoreBlockEntity(this.serverPlayer);
         if (coreBe == null) {
+            return;
+        }
+        if (!io.github.chema280101.logtech.security.NetworkSecurity.canPlayerDo(this.serverPlayer, io.github.chema280101.logtech.security.PlayerAction.CONFIGURE_RULES, coreBe)) {
             return;
         }
 
@@ -272,6 +330,8 @@ public class CoreMenu extends AbstractContainerMenu {
 
         AutomationRule<ItemKey> rule = new AutomationRule<>(ruleIndex, itemKey, condition, threshold, action, enabled);
         coreBe.getRuleManager().setRule(ruleIndex, rule);
+        String ruleItemId = (itemKey != null) ? net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(itemKey.item()).toString() : "";
+        coreBe.logActivity(this.serverPlayer, io.github.chema280101.logtech.security.ActivityAction.CHANGE_RULES, ruleItemId, 1L);
         coreBe.setChanged();
 
         sendFullSync(coreBe);
@@ -291,6 +351,12 @@ public class CoreMenu extends AbstractContainerMenu {
         this.clientColdCapacity = payload.coldCapacity();
         this.clientMachines = payload.machines();
         this.clientRules = payload.rules();
+        this.clientCanAdmin = payload.canAdmin();
+        this.clientIsClaimable = payload.isClaimable();
+        this.clientOwnerName = payload.ownerName();
+        this.clientSecurityModeOrdinal = payload.securityModeOrdinal();
+        this.clientAccessEntries = payload.accessEntries();
+        this.clientOnlinePlayers = payload.onlinePlayers();
 
         if (this.onSyncCallback != null) {
             this.onSyncCallback.run();
@@ -311,4 +377,10 @@ public class CoreMenu extends AbstractContainerMenu {
     public long getClientColdCapacity() { return clientColdCapacity; }
     public List<CoreSyncPayload.MachineInfo> getClientMachines() { return clientMachines; }
     public List<CoreSyncPayload.RuleDto> getClientRules() { return clientRules; }
+    public boolean canClientAdmin() { return clientCanAdmin; }
+    public boolean isClientClaimable() { return clientIsClaimable; }
+    public String getClientOwnerName() { return clientOwnerName; }
+    public int getClientSecurityModeOrdinal() { return clientSecurityModeOrdinal; }
+    public List<CoreSyncPayload.AccessEntryDto> getClientAccessEntries() { return clientAccessEntries; }
+    public List<CoreSyncPayload.OnlinePlayerDto> getClientOnlinePlayers() { return clientOnlinePlayers; }
 }

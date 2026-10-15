@@ -1,6 +1,9 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/orientable_with_bottom",
   "textures": {
-    "all": "logtech:block/cold_rack"
+    "bottom": "logtech:block/machine_bottom",
+    "front": "logtech:block/cold_rack_front",
+    "side": "logtech:block/cold_rack_side",
+    "top": "logtech:block/machine_top"
   }
 }

@@ -1,5 +1,6 @@
 package io.github.chema280101.logtech;
 
+import io.github.chema280101.logtech.block.CoreBlockEntity;
 import io.github.chema280101.logtech.data.DataGenerators;
 import io.github.chema280101.logtech.registry.ModBlockEntities;
 import io.github.chema280101.logtech.registry.ModBlocks;
@@ -49,5 +50,43 @@ public class LogTech {
 
         // Registro de comandos
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(io.github.chema280101.logtech.ore.DepositCommands::registerCommands);
+
+        // Recálculo de pares de compactación al arrancar el servidor
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.server.ServerStartedEvent event) -> {
+            net.minecraft.server.MinecraftServer server = event.getServer();
+            io.github.chema280101.logtech.storage.CompactionRegistry.reload(server.getRecipeManager(), server.registryAccess());
+        });
+
+        // Recálculo de pares de compactación al recargar datapacks
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.OnDatapackSyncEvent event) -> {
+            if (event.getPlayer() == null) {
+                net.minecraft.server.MinecraftServer server = event.getPlayerList().getServer();
+                if (server != null) {
+                    io.github.chema280101.logtech.storage.CompactionRegistry.reload(server.getRecipeManager(), server.registryAccess());
+                } else {
+                    io.github.chema280101.logtech.storage.CompactionRegistry.markDirty();
+                }
+            }
+        });
+
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.AddReloadListenerEvent event) -> {
+            io.github.chema280101.logtech.storage.CompactionRegistry.markDirty();
+        });
+
+        // Protección contra rotura del Núcleo en redes privadas
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.level.BlockEvent.BreakEvent event) -> {
+            if (event.getState().is(ModBlocks.CORE.get()) && event.getLevel() instanceof net.minecraft.world.level.Level level && !level.isClientSide()) {
+                net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(event.getPos());
+                if (be instanceof CoreBlockEntity coreBe) {
+                    if (!io.github.chema280101.logtech.security.NetworkSecurity.canPlayerDo(event.getPlayer(), io.github.chema280101.logtech.security.PlayerAction.BREAK_CORE, coreBe)) {
+                        event.setCanceled(true);
+                        event.getPlayer().displayClientMessage(
+                                net.minecraft.network.chat.Component.translatable("chat.logtech.security.cannot_break_private"),
+                                true
+                        );
+                    }
+                }
+            }
+        });
     }
 }

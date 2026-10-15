@@ -25,7 +25,9 @@ public record TerminalActionPayload(
         INSERT_CURSOR_ALL,
         INSERT_CURSOR_ONE,
         INSERT_SLOT,
-        CYCLE_PIN_POLICY
+        CYCLE_PIN_POLICY,
+        DESTROY_CURSOR,
+        RESTORE_TRASH
     }
 
     public static final Type<TerminalActionPayload> TYPE =

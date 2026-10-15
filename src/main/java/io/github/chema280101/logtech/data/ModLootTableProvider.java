@@ -65,6 +65,7 @@ public class ModLootTableProvider {
             this.dropSelf(ModBlocks.CENTRIFUGE.get());
             this.dropSelf(ModBlocks.WASHER.get());
             this.dropSelf(ModBlocks.SLAG_BLOCK.get());
+            this.dropSelf(ModBlocks.HEATSINK.get());
         }
 
         @Override
@@ -81,7 +82,8 @@ public class ModLootTableProvider {
                     ModBlocks.COAL_GENERATOR.get(),
                     ModBlocks.CENTRIFUGE.get(),
                     ModBlocks.WASHER.get(),
-                    ModBlocks.SLAG_BLOCK.get()
+                    ModBlocks.SLAG_BLOCK.get(),
+                    ModBlocks.HEATSINK.get()
             );
         }
     }

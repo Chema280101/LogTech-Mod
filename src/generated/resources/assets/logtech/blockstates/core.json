@@ -1,7 +1,19 @@
 {
   "variants": {
-    "": {
+    "facing=east": {
+      "model": "logtech:block/core",
+      "y": 90
+    },
+    "facing=north": {
       "model": "logtech:block/core"
+    },
+    "facing=south": {
+      "model": "logtech:block/core",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "logtech:block/core",
+      "y": 270
     }
   }
 }

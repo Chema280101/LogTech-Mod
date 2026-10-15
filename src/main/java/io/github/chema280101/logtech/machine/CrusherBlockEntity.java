@@ -27,9 +27,14 @@ import io.github.chema280101.logtech.network.NetworkMember;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import io.github.chema280101.logtech.registry.ModBlocks;
+import io.github.chema280101.logtech.LogTechConfig;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
 
-public class CrusherBlockEntity extends BlockEntity implements MenuProvider, NetworkMember {
+public class CrusherBlockEntity extends BlockEntity implements MenuProvider, NetworkMember, HeatDissipatingMachine, MachineConfigurable {
     public static final int ENERGY_CAPACITY = 10_000;
     public static final int ENERGY_MAX_RECEIVE = 100;
 
@@ -51,6 +56,23 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
         }
     };
 
+    private final ItemStackHandler firmwareHandler = new ItemStackHandler(1) {
+        @Override
+        protected void onContentsChanged(int slot) {
+            setChanged();
+        }
+
+        @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            return stack.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem;
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            return 1;
+        }
+    };
+
     private final MachineEnergyStorage energyStorage = new MachineEnergyStorage(
             ENERGY_CAPACITY,
             ENERGY_MAX_RECEIVE,
@@ -59,10 +81,15 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
     );
 
     private int progress = 0;
+    private double progressAccumulator = 0.0;
     private int maxProgress = 100;
     private MachineStatus status = MachineStatus.NO_INPUT;
     private EnergyPriority energyPriority = EnergyPriority.NORMAL;
     private boolean energyShed = false;
+    private final HeatModel heatModel = new HeatModel();
+    private double cachedCooling = -1.0;
+    private int cachedHeatsinks = 0;
+    private int cachedWaterSides = 0;
 
     private CrushingRecipe cachedRecipe = null;
     private Item lastInputItem = Items.AIR;
@@ -79,6 +106,8 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
                 case 5 -> (CrusherBlockEntity.this.energyStorage.getMaxEnergyStored() >> 16) & 0xFFFF;
                 case 6 -> CrusherBlockEntity.this.status.ordinal();
                 case 7 -> CrusherBlockEntity.this.energyPriority.ordinal();
+                case 8 -> (int) Math.round(CrusherBlockEntity.this.heatModel.getHeat());
+                case 9 -> (int) Math.round(CrusherBlockEntity.this.getCachedCooling() * 10.0);
                 default -> 0;
             };
         }
@@ -97,12 +126,13 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
                     CrusherBlockEntity.this.energyPriority = EnergyPriority.fromOrdinal(value);
                     CrusherBlockEntity.this.setChanged();
                 }
+                case 8 -> CrusherBlockEntity.this.heatModel.setHeat(value);
             }
         }
 
         @Override
         public int getCount() {
-            return 8;
+            return 10;
         }
     };
 
@@ -208,9 +238,100 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
         return this.status;
     }
 
+    public ItemStackHandler getFirmwareHandler() {
+        return this.firmwareHandler;
+    }
+
+    @Override
+    public io.github.chema280101.logtech.machine.firmware.FirmwareType getFirmwareType() {
+        ItemStack stack = this.firmwareHandler.getStackInSlot(0);
+        if (stack.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem fw) {
+            return fw.getFirmwareType();
+        }
+        return io.github.chema280101.logtech.machine.firmware.FirmwareType.NONE;
+    }
+
     @Override
     public int requestedEnergy() {
-        return Math.max(0, this.energyStorage.getMaxEnergyStored() - this.energyStorage.getEnergyStored());
+        if (this.heatModel.isOverheated()) {
+            return 0;
+        }
+        int deficit = Math.max(0, this.energyStorage.getMaxEnergyStored() - this.energyStorage.getEnergyStored());
+        return io.github.chema280101.logtech.machine.firmware.FirmwareEffects.calculateRequestedEnergy(
+                deficit,
+                this.heatModel.getSpeedMultiplier(),
+                getFirmwareType(),
+                LogTechConfig.FIRMWARE_ECO_ENERGY.get(),
+                LogTechConfig.FIRMWARE_TURBO_ENERGY.get()
+        );
+    }
+
+    @Override
+    public double getHeat() {
+        return this.heatModel.getHeat();
+    }
+
+    @Override
+    public HeatModel getHeatModel() {
+        return this.heatModel;
+    }
+
+    @Override
+    public void recalculateCooling() {
+        if (this.level == null) {
+            return;
+        }
+        int heatsinks = 0;
+        int water = 0;
+        for (Direction dir : Direction.values()) {
+            BlockPos neighborPos = this.worldPosition.relative(dir);
+            BlockState neighborState = this.level.getBlockState(neighborPos);
+            if (neighborState.is(ModBlocks.HEATSINK.get())) {
+                heatsinks++;
+            } else {
+                FluidState fluid = this.level.getFluidState(neighborPos);
+                if (fluid.is(FluidTags.WATER) || fluid.is(Fluids.WATER) || fluid.is(Fluids.FLOWING_WATER)) {
+                    water++;
+                }
+            }
+        }
+        this.cachedHeatsinks = heatsinks;
+        this.cachedWaterSides = water;
+        double baseCooling = LogTechConfig.HEAT_COOLING_RATE.get();
+        double sinkRate = LogTechConfig.HEAT_HEATSINK_COOLING.get();
+        double waterRate = LogTechConfig.HEAT_WATER_COOLING.get();
+        this.cachedCooling = DissipationLogic.calculateCooling(baseCooling, heatsinks, water, sinkRate, waterRate);
+        setChanged();
+    }
+
+    @Override
+    public double getCachedCooling() {
+        if (this.cachedCooling < 0.0) {
+            if (this.level != null) {
+                recalculateCooling();
+            } else {
+                return LogTechConfig.HEAT_COOLING_RATE.get();
+            }
+        }
+        return this.cachedCooling;
+    }
+
+    @Override
+    public int getCachedHeatsinks() {
+        return this.cachedHeatsinks;
+    }
+
+    @Override
+    public int getCachedWaterSides() {
+        return this.cachedWaterSides;
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        if (this.level != null && !this.level.isClientSide()) {
+            recalculateCooling();
+        }
     }
 
     @Override
@@ -287,11 +408,52 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
     }
 
     public void serverTick(Level level, BlockPos pos, BlockState state) {
+        io.github.chema280101.logtech.machine.firmware.FirmwareType fw = getFirmwareType();
+
+        if (level.getGameTime() % 20 == 0) {
+            double baseGen = io.github.chema280101.logtech.LogTechConfig.HEAT_BASE_GENERATION.get();
+            double cooling = getCachedCooling();
+
+            double normalSlowdown = io.github.chema280101.logtech.LogTechConfig.HEAT_SLOWDOWN_THRESHOLD.get();
+            double normalOverheat = io.github.chema280101.logtech.LogTechConfig.HEAT_OVERHEAT_THRESHOLD.get();
+            double normalResume = io.github.chema280101.logtech.LogTechConfig.HEAT_RESUME_THRESHOLD.get();
+            double normalSlowdownSpeed = io.github.chema280101.logtech.LogTechConfig.HEAT_SLOWDOWN_SPEED.get();
+
+            double safeOverheat = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_SAFE_OVERHEAT_THRESHOLD.get();
+            double safeResume = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_SAFE_RESUME_THRESHOLD.get();
+
+            this.heatModel.setSlowdownThreshold(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getSlowdownThreshold(fw, normalSlowdown, safeOverheat));
+            this.heatModel.setOverheatThreshold(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getOverheatThreshold(fw, normalOverheat, safeOverheat));
+            this.heatModel.setResumeThreshold(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getResumeThreshold(fw, normalResume, safeResume));
+            this.heatModel.setSlowdownSpeed(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getSlowdownSpeed(fw, normalSlowdownSpeed));
+
+            double ecoHeat = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_ECO_HEAT.get();
+            double turboHeat = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_TURBO_HEAT.get();
+            double heatMult = io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getHeatMultiplier(fw, ecoHeat, turboHeat);
+
+            boolean isWorking = (this.status == MachineStatus.WORKING);
+            this.heatModel.tick(isWorking, baseGen, heatMult, cooling);
+            setChanged();
+        }
+
+        if (this.heatModel.isOverheated()) {
+            if (this.status != MachineStatus.OVERHEATED) {
+                this.status = MachineStatus.OVERHEATED;
+                setChanged();
+            }
+            this.activityCounter.tick(false);
+            return;
+        } else if (this.status == MachineStatus.OVERHEATED) {
+            this.status = MachineStatus.IDLE;
+            setChanged();
+        }
+
         ItemStack inputStack = this.itemHandler.getStackInSlot(0);
         if (inputStack.isEmpty()) {
             if (this.status != MachineStatus.NO_INPUT) {
                 this.status = MachineStatus.NO_INPUT;
                 this.progress = 0;
+                this.progressAccumulator = 0.0;
                 setChanged();
             }
             this.activityCounter.tick(false);
@@ -310,6 +472,7 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
             if (this.status != MachineStatus.NO_INPUT) {
                 this.status = MachineStatus.NO_INPUT;
                 this.progress = 0;
+                this.progressAccumulator = 0.0;
                 setChanged();
             }
             this.activityCounter.tick(false);
@@ -332,7 +495,14 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
             return;
         }
 
-        int energyCost = this.cachedRecipe.getEnergyPerTick();
+        int baseEnergyCost = this.cachedRecipe.getEnergyPerTick();
+        int energyCost = io.github.chema280101.logtech.machine.firmware.FirmwareEffects.calculateEnergyCost(
+                baseEnergyCost,
+                fw,
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_ECO_ENERGY.get(),
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_TURBO_ENERGY.get()
+        );
+
         if (this.energyStorage.getEnergyStored() < energyCost) {
             MachineStatus target = this.energyShed ? MachineStatus.SHED : MachineStatus.NO_ENERGY;
             if (this.status != target) {
@@ -349,9 +519,21 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
             setChanged();
         }
 
+        double effectiveSpeed = io.github.chema280101.logtech.machine.firmware.FirmwareEffects.calculateEffectiveSpeed(
+                fw,
+                this.heatModel.getSpeedMultiplier(),
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_ECO_SPEED.get(),
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_TURBO_SPEED.get()
+        );
+
         this.energyStorage.consume(energyCost);
         this.activityCounter.recordEnergyConsumed(energyCost);
-        this.progress++;
+        this.progressAccumulator += effectiveSpeed;
+        int steps = (int) this.progressAccumulator;
+        if (steps > 0) {
+            this.progress += steps;
+            this.progressAccumulator -= steps;
+        }
         this.activityCounter.tick(true);
 
         if (this.progress >= this.maxProgress) {
@@ -364,6 +546,7 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
             }
             this.activityCounter.recordItemOut(recipeOutput.getCount());
             this.progress = 0;
+            this.progressAccumulator = 0.0;
 
             ItemStack remainingInput = this.itemHandler.getStackInSlot(0);
             if (remainingInput.isEmpty()) {
@@ -383,6 +566,10 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
                 Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
             }
         }
+        ItemStack fwStack = this.firmwareHandler.getStackInSlot(0);
+        if (!fwStack.isEmpty()) {
+            Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), fwStack);
+        }
     }
 
     @Override
@@ -398,19 +585,23 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
     @Nullable
     @Override
     public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
-        return new CrusherMenu(containerId, playerInventory, this.worldPosition, this.itemHandler, this.dataAccess);
+        return new CrusherMenu(containerId, playerInventory, this.worldPosition, this.itemHandler, this.firmwareHandler, this.dataAccess);
     }
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.putInt("data_version", 2);
+        tag.putInt("data_version", 4);
         tag.put("Inventory", this.itemHandler.serializeNBT(registries));
+        tag.put("Firmware", this.firmwareHandler.serializeNBT(registries));
         tag.putInt("Energy", this.energyStorage.getEnergyStored());
         tag.putInt("Progress", this.progress);
+        tag.putDouble("ProgressAccumulator", this.progressAccumulator);
         tag.putInt("MaxProgress", this.maxProgress);
         tag.putInt("Status", this.status.ordinal());
         tag.putString("energy_priority", this.energyPriority.name());
+        tag.putDouble("Heat", this.heatModel.getHeat());
+        tag.putBoolean("Overheated", this.heatModel.isOverheated());
     }
 
     @Override
@@ -419,10 +610,20 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
         if (tag.contains("Inventory")) {
             this.itemHandler.deserializeNBT(registries, tag.getCompound("Inventory"));
         }
+        if (tag.contains("Firmware")) {
+            this.firmwareHandler.deserializeNBT(registries, tag.getCompound("Firmware"));
+        } else {
+            this.firmwareHandler.setStackInSlot(0, ItemStack.EMPTY);
+        }
         if (tag.contains("Energy")) {
             this.energyStorage.setEnergy(tag.getInt("Energy"));
         }
         this.progress = tag.getInt("Progress");
+        if (tag.contains("ProgressAccumulator")) {
+            this.progressAccumulator = tag.getDouble("ProgressAccumulator");
+        } else {
+            this.progressAccumulator = 0.0;
+        }
         this.maxProgress = tag.contains("MaxProgress") ? tag.getInt("MaxProgress") : 100;
         if (tag.contains("Status")) {
             int ord = tag.getInt("Status");
@@ -434,6 +635,12 @@ public class CrusherBlockEntity extends BlockEntity implements MenuProvider, Net
             this.energyPriority = EnergyPriority.fromName(tag.getString("energy_priority"));
         } else {
             this.energyPriority = EnergyPriority.NORMAL;
+        }
+        if (tag.contains("Heat")) {
+            this.heatModel.setHeat(tag.getDouble("Heat"));
+        }
+        if (tag.contains("Overheated")) {
+            this.heatModel.setOverheated(tag.getBoolean("Overheated"));
         }
         ItemStack input = this.itemHandler.getStackInSlot(0);
         this.lastInputItem = input.isEmpty() ? Items.AIR : input.getItem();

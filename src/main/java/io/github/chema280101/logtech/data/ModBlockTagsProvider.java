@@ -43,6 +43,7 @@ public class ModBlockTagsProvider extends BlockTagsProvider {
                 .add(ModBlocks.COAL_GENERATOR.get())
                 .add(ModBlocks.CENTRIFUGE.get())
                 .add(ModBlocks.WASHER.get())
-                .add(ModBlocks.SLAG_BLOCK.get());
+                .add(ModBlocks.SLAG_BLOCK.get())
+                .add(ModBlocks.HEATSINK.get());
     }
 }

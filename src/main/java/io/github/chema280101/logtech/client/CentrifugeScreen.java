@@ -60,8 +60,9 @@ public class CentrifugeScreen extends AbstractContainerScreen<CentrifugeMenu> {
         // 2. Limpiar zona central del horno vanilla para nuestro diseño personalizado
         guiGraphics.fill(x + 44, y + 14, x + 162, y + 71, 0xFFC6C6C6);
 
-        // 3. Ranura de entrada en (47, 34)
+        // 3. Ranura de entrada en (47, 34) y Firmware en (47, 14)
         drawSlot(guiGraphics, x + 47, y + 34);
+        drawSlot(guiGraphics, x + 47, y + 14);
 
         // 4. Tres ranuras de salida en (101, 34), (121, 34) y (141, 34)
         drawSlot(guiGraphics, x + 101, y + 34);
@@ -92,12 +93,29 @@ public class CentrifugeScreen extends AbstractContainerScreen<CentrifugeMenu> {
             guiGraphics.fill(barX + 2, barY + 1 + (46 - energyHeight), barX + 4, barY + 47, 0xFFFF7043);
         }
 
-        // 7. Texto de estado explícito
+        // 7. Barra medidora de calor
+        int heatX = x + 32;
+        int heatY = y + 18;
+        guiGraphics.fill(heatX, heatY, heatX + 12, heatY + 48, 0xFF373737);
+        guiGraphics.fill(heatX + 11, heatY, heatX + 12, heatY + 48, 0xFFFFFFFF);
+        guiGraphics.fill(heatX, heatY + 47, heatX + 12, heatY + 48, 0xFFFFFFFF);
+        guiGraphics.fill(heatX + 1, heatY + 1, heatX + 11, heatY + 47, 0xFF2B2B2B);
+
+        int heat = this.menu.getHeat();
+        int heatHeight = Math.min(46, (int) Math.round((heat * 46.0) / 100.0));
+        if (heatHeight > 0) {
+            int barColor = (heat >= 100) ? 0xFFB71C1C : (heat > 70 ? 0xFFFF5722 : 0xFFFF9800);
+            int highlightColor = (heat >= 100) ? 0xFFE53935 : (heat > 70 ? 0xFFFF8A65 : 0xFFFFB74D);
+            guiGraphics.fill(heatX + 1, heatY + 1 + (46 - heatHeight), heatX + 11, heatY + 47, barColor);
+            guiGraphics.fill(heatX + 2, heatY + 1 + (46 - heatHeight), heatX + 4, heatY + 47, highlightColor);
+        }
+
+        // 8. Texto de estado explícito
         MachineStatus status = this.menu.getStatus();
         Component statusText = status.getDisplayName();
         int textColor = switch (status) {
             case WORKING -> 0x2E7D32;
-            case NO_ENERGY, SHED -> 0xD32F2F;
+            case NO_ENERGY, SHED, OVERHEATED -> 0xD32F2F;
             case NO_INPUT, NO_RESOURCE, NO_FLUID, IDLE -> 0x757575;
             case OUTPUT_FULL -> 0xF57C00;
         };
@@ -127,6 +145,22 @@ public class CentrifugeScreen extends AbstractContainerScreen<CentrifugeMenu> {
         int barY = this.topPos + 18;
         if (mouseX >= barX && mouseX < barX + 12 && mouseY >= barY && mouseY < barY + 48) {
             guiGraphics.renderTooltip(this.font, Component.literal(this.menu.getEnergy() + " / " + this.menu.getMaxEnergy() + " FE"), mouseX, mouseY);
+        }
+
+        // Tooltip de calor al pasar el ratón por la barra de calor
+        int heatX = this.leftPos + 32;
+        int heatY = this.topPos + 18;
+        if (mouseX >= heatX && mouseX < heatX + 12 && mouseY >= heatY && mouseY < heatY + 48) {
+            java.util.List<Component> tooltip = new java.util.ArrayList<>();
+            int heat = this.menu.getHeat();
+            tooltip.add(Component.translatable("gui.logtech.heat.tooltip", heat));
+            tooltip.add(Component.translatable("gui.logtech.cooling.tooltip", String.format(java.util.Locale.ROOT, "%.1f", this.menu.getCooling())).withStyle(net.minecraft.ChatFormatting.AQUA));
+            if (this.menu.getStatus() == MachineStatus.OVERHEATED) {
+                tooltip.add(Component.translatable("gui.logtech.heat.overheated").withStyle(net.minecraft.ChatFormatting.RED, net.minecraft.ChatFormatting.BOLD));
+            } else if (heat > 70) {
+                tooltip.add(Component.translatable("gui.logtech.heat.slowdown").withStyle(net.minecraft.ChatFormatting.GOLD));
+            }
+            guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         }
 
         // Tooltip de progreso en la flecha

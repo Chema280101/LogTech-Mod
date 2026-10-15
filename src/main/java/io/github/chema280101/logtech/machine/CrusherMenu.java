@@ -23,16 +23,16 @@ public class CrusherMenu extends AbstractContainerMenu implements PriorityConfig
 
     // Constructor cliente
     public CrusherMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buf) {
-        this(containerId, playerInventory, buf.readBlockPos(), new ItemStackHandler(2), new SimpleContainerData(8));
+        this(containerId, playerInventory, buf.readBlockPos(), new ItemStackHandler(2), new ItemStackHandler(1), new SimpleContainerData(10));
     }
 
     // Constructor servidor
-    public CrusherMenu(int containerId, Inventory playerInventory, BlockPos pos, IItemHandler itemHandler, ContainerData data) {
+    public CrusherMenu(int containerId, Inventory playerInventory, BlockPos pos, IItemHandler itemHandler, IItemHandler firmwareHandler, ContainerData data) {
         super(ModMenuTypes.CRUSHER.get(), containerId);
         this.pos = pos;
         this.data = data;
 
-        checkContainerDataCount(data, 8);
+        checkContainerDataCount(data, 10);
         addDataSlots(data);
 
         // Ranura 0: Entrada
@@ -43,6 +43,19 @@ public class CrusherMenu extends AbstractContainerMenu implements PriorityConfig
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return false;
+            }
+        });
+
+        // Ranura 2: Firmware (solo chips de firmware, máximo 1)
+        this.addSlot(new SlotItemHandler(firmwareHandler, 0, 56, 15) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return stack.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem;
+            }
+
+            @Override
+            public int getMaxStackSize() {
+                return 1;
             }
         });
 
@@ -97,6 +110,14 @@ public class CrusherMenu extends AbstractContainerMenu implements PriorityConfig
         this.data.set(7, priority != null ? priority.ordinal() : EnergyPriority.NORMAL.ordinal());
     }
 
+    public int getHeat() {
+        return this.data.get(8);
+    }
+
+    public double getCooling() {
+        return this.data.get(9) / 10.0;
+    }
+
     @Override
     public boolean stillValid(Player player) {
         return stillValid(ContainerLevelAccess.create(player.level(), this.pos), player, ModBlocks.CRUSHER.get());
@@ -111,25 +132,29 @@ public class CrusherMenu extends AbstractContainerMenu implements PriorityConfig
             itemstack = stackInSlot.copy();
 
             if (index == 1) { // Salida: mover al inventario del jugador
-                if (!this.moveItemStackTo(stackInSlot, 2, 38, true)) {
+                if (!this.moveItemStackTo(stackInSlot, 3, 39, true)) {
                     return ItemStack.EMPTY;
                 }
                 slot.onQuickCraft(stackInSlot, itemstack);
-            } else if (index == 0) { // Entrada: mover al inventario del jugador
-                if (!this.moveItemStackTo(stackInSlot, 2, 38, false)) {
+            } else if (index == 0 || index == 2) { // Entrada o Firmware: mover al inventario del jugador
+                if (!this.moveItemStackTo(stackInSlot, 3, 39, false)) {
                     return ItemStack.EMPTY;
                 }
             } else { // Desde el inventario del jugador
-                if (hasRecipe(player.level(), stackInSlot)) {
+                if (stackInSlot.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem) {
+                    if (!this.moveItemStackTo(stackInSlot, 2, 3, false)) {
+                        return ItemStack.EMPTY;
+                    }
+                } else if (hasRecipe(player.level(), stackInSlot)) {
                     if (!this.moveItemStackTo(stackInSlot, 0, 1, false)) {
                         return ItemStack.EMPTY;
                     }
-                } else if (index >= 2 && index < 29) {
-                    if (!this.moveItemStackTo(stackInSlot, 29, 38, false)) {
+                } else if (index >= 3 && index < 30) {
+                    if (!this.moveItemStackTo(stackInSlot, 30, 39, false)) {
                         return ItemStack.EMPTY;
                     }
-                } else if (index >= 29 && index < 38) {
-                    if (!this.moveItemStackTo(stackInSlot, 2, 29, false)) {
+                } else if (index >= 30 && index < 39) {
+                    if (!this.moveItemStackTo(stackInSlot, 3, 30, false)) {
                         return ItemStack.EMPTY;
                     }
                 }

@@ -46,5 +46,24 @@ class NetworkSecurityTest {
         assertNotNull(PlayerAction.valueOf("CONFIGURE_RULES"));
         assertNotNull(PlayerAction.valueOf("CHANGE_PRIORITY"));
         assertNotNull(PlayerAction.valueOf("FLASH_FIRMWARE"));
+        assertNotNull(PlayerAction.valueOf("CLAIM_CORE"));
+        assertNotNull(PlayerAction.valueOf("MANAGE_ACCESS"));
+        assertNotNull(PlayerAction.valueOf("BREAK_CORE"));
+    }
+
+    @Test
+    @DisplayName("canPlayerDo delega correctamente cuando se provee un contexto NetworkSecurityManager")
+    void testCanPlayerDoWithSecurityContext() {
+        NetworkSecurityManager sec = new NetworkSecurityManager();
+        sec.setMode(SecurityMode.PRIVATE);
+
+        // Sin permisos en modo privado -> denegado
+        assertFalse(NetworkSecurity.canPlayerDo(null, PlayerAction.OPEN_TERMINAL, sec));
+        assertFalse(PlayerSecurity.canPlayerDo(null, PlayerAction.OPEN_TERMINAL, sec));
+
+        // En modo abierto -> permitido
+        sec.setMode(SecurityMode.OPEN);
+        assertTrue(NetworkSecurity.canPlayerDo(null, PlayerAction.OPEN_TERMINAL, sec));
+        assertTrue(PlayerSecurity.canPlayerDo(null, PlayerAction.OPEN_TERMINAL, sec));
     }
 }

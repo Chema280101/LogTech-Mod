@@ -19,9 +19,41 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DirectionProperty;
+
 public class CoreBlock extends Block implements EntityBlock {
+    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+
     public CoreBlock(Properties properties) {
         super(properties);
+        this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING);
+    }
+
+    @Nullable
+    @Override
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
+        return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+    }
+
+    @Override
+    protected BlockState rotate(BlockState state, Rotation rotation) {
+        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
+    }
+
+    @Override
+    protected BlockState mirror(BlockState state, Mirror mirror) {
+        return state.rotate(mirror.getRotation(state.getValue(FACING)));
     }
 
     @Nullable
@@ -55,7 +87,7 @@ public class CoreBlock extends Block implements EntityBlock {
             InteractionHand hand,
             BlockHitResult hitResult
     ) {
-        if (stack.isEmpty()) {
+        if (stack.isEmpty() || stack.getItem() instanceof io.github.chema280101.logtech.item.ConfigKeyItem) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
 
@@ -65,11 +97,17 @@ public class CoreBlock extends Block implements EntityBlock {
 
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof CoreBlockEntity coreBe) {
+            if (!io.github.chema280101.logtech.security.NetworkSecurity.canPlayerDo(player, io.github.chema280101.logtech.security.PlayerAction.INSERT_ITEM, coreBe)) {
+                player.displayClientMessage(Component.translatable("chat.logtech.security.access_denied"), true);
+                return ItemInteractionResult.FAIL;
+            }
             ItemKey key = ItemKey.of(stack);
             int count = stack.getCount();
             long inserted = coreBe.insert(key, count, false);
             if (inserted > 0) {
                 stack.shrink((int) inserted);
+                String itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString();
+                coreBe.logActivity(player, io.github.chema280101.logtech.security.ActivityAction.INSERT, itemId, inserted);
                 player.displayClientMessage(
                         Component.translatable(
                                 "chat.logtech.core.inserted",
@@ -112,6 +150,14 @@ public class CoreBlock extends Block implements EntityBlock {
         }
 
         if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be instanceof CoreBlockEntity coreBe) {
+                if (!io.github.chema280101.logtech.security.NetworkSecurity.canPlayerDo(serverPlayer, io.github.chema280101.logtech.security.PlayerAction.OPEN_CORE, coreBe)) {
+                    serverPlayer.displayClientMessage(Component.translatable("chat.logtech.security.access_denied"), true);
+                    return InteractionResult.CONSUME;
+                }
+            }
+
             serverPlayer.openMenu(
                     new net.minecraft.world.SimpleMenuProvider(
                             (containerId, inventory, p) -> new CoreMenu(containerId, inventory, pos),
@@ -123,6 +169,18 @@ public class CoreBlock extends Block implements EntityBlock {
         }
 
         return InteractionResult.PASS;
+    }
+
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable net.minecraft.world.entity.LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+        if (!level.isClientSide() && placer instanceof Player player) {
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be instanceof CoreBlockEntity coreBe) {
+                coreBe.getSecurityManager().setOwner(player.getUUID(), player.getName().getString());
+                coreBe.setChanged();
+            }
+        }
     }
 
     @Override

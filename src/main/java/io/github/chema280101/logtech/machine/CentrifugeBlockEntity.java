@@ -33,12 +33,17 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.level.material.FluidState;
+import io.github.chema280101.logtech.registry.ModBlocks;
+import io.github.chema280101.logtech.LogTechConfig;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, NetworkMember {
+public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, NetworkMember, HeatDissipatingMachine, MachineConfigurable {
     public static final int ENERGY_CAPACITY = 20_000;
     public static final int ENERGY_MAX_RECEIVE = 200;
 
@@ -66,6 +71,23 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
         }
     };
 
+    private final ItemStackHandler firmwareHandler = new ItemStackHandler(1) {
+        @Override
+        protected void onContentsChanged(int slot) {
+            setChanged();
+        }
+
+        @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            return stack.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem;
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            return 1;
+        }
+    };
+
     private final MachineEnergyStorage energyStorage = new MachineEnergyStorage(
             ENERGY_CAPACITY,
             ENERGY_MAX_RECEIVE,
@@ -74,10 +96,15 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
     );
 
     private int progress = 0;
+    private double progressAccumulator = 0.0;
     private int maxProgress = 120;
     private MachineStatus status = MachineStatus.NO_INPUT;
     private EnergyPriority energyPriority = EnergyPriority.NORMAL;
     private boolean energyShed = false;
+    private final HeatModel heatModel = new HeatModel();
+    private double cachedCooling = -1.0;
+    private int cachedHeatsinks = 0;
+    private int cachedWaterSides = 0;
 
     private CentrifugingRecipe cachedRecipe = null;
     private Item lastInputItem = Items.AIR;
@@ -97,6 +124,8 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
                 case 5 -> (CentrifugeBlockEntity.this.energyStorage.getMaxEnergyStored() >> 16) & 0xFFFF;
                 case 6 -> CentrifugeBlockEntity.this.status.ordinal();
                 case 7 -> CentrifugeBlockEntity.this.energyPriority.ordinal();
+                case 8 -> (int) Math.round(CentrifugeBlockEntity.this.heatModel.getHeat());
+                case 9 -> (int) Math.round(CentrifugeBlockEntity.this.getCachedCooling() * 10.0);
                 default -> 0;
             };
         }
@@ -115,12 +144,13 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
                     CentrifugeBlockEntity.this.energyPriority = EnergyPriority.fromOrdinal(value);
                     CentrifugeBlockEntity.this.setChanged();
                 }
+                case 8 -> CentrifugeBlockEntity.this.heatModel.setHeat(value);
             }
         }
 
         @Override
         public int getCount() {
-            return 8;
+            return 10;
         }
     };
 
@@ -160,6 +190,16 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
         }
     };
 
+    private boolean canExtractAutomated(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+        io.github.chema280101.logtech.machine.firmware.FirmwareType fw = getFirmwareType();
+        if (fw != io.github.chema280101.logtech.machine.firmware.FirmwareType.SELECTIVE) return true;
+        ItemStack fwStack = this.firmwareHandler.getStackInSlot(0);
+        net.minecraft.world.item.Item filterItem = io.github.chema280101.logtech.registry.ModDataComponents.getFirmwareFilter(fwStack);
+        if (filterItem == null) return true;
+        return stack.getItem() == filterItem;
+    }
+
     private final IItemHandler outputHandler = new IItemHandler() {
         @Override
         public int getSlots() {
@@ -168,7 +208,13 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
 
         @Override
         public ItemStack getStackInSlot(int slot) {
-            return isOutputSlot(slot) ? itemHandler.getStackInSlot(slot) : ItemStack.EMPTY;
+            if (isOutputSlot(slot)) {
+                ItemStack stack = itemHandler.getStackInSlot(slot);
+                if (canExtractAutomated(stack)) {
+                    return stack;
+                }
+            }
+            return ItemStack.EMPTY;
         }
 
         @Override
@@ -179,6 +225,10 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
             if (isOutputSlot(slot)) {
+                ItemStack stack = itemHandler.getStackInSlot(slot);
+                if (!canExtractAutomated(stack)) {
+                    return ItemStack.EMPTY;
+                }
                 return itemHandler.extractItem(slot, amount, simulate);
             }
             return ItemStack.EMPTY;
@@ -207,6 +257,19 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
         return this.itemHandler;
     }
 
+    public ItemStackHandler getFirmwareHandler() {
+        return this.firmwareHandler;
+    }
+
+    @Override
+    public io.github.chema280101.logtech.machine.firmware.FirmwareType getFirmwareType() {
+        ItemStack stack = this.firmwareHandler.getStackInSlot(0);
+        if (stack.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem fwItem) {
+            return fwItem.getFirmwareType();
+        }
+        return io.github.chema280101.logtech.machine.firmware.FirmwareType.NONE;
+    }
+
     public IItemHandler getItemHandler(@Nullable Direction side) {
         if (side == Direction.DOWN) {
             return this.outputHandler;
@@ -232,7 +295,85 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
 
     @Override
     public int requestedEnergy() {
-        return Math.max(0, this.energyStorage.getMaxEnergyStored() - this.energyStorage.getEnergyStored());
+        if (this.heatModel.isOverheated()) {
+            return 0;
+        }
+        int deficit = Math.max(0, this.energyStorage.getMaxEnergyStored() - this.energyStorage.getEnergyStored());
+        return io.github.chema280101.logtech.machine.firmware.FirmwareEffects.calculateRequestedEnergy(
+                deficit,
+                this.heatModel.getSpeedMultiplier(),
+                getFirmwareType(),
+                LogTechConfig.FIRMWARE_ECO_ENERGY.get(),
+                LogTechConfig.FIRMWARE_TURBO_ENERGY.get()
+        );
+    }
+
+    @Override
+    public double getHeat() {
+        return this.heatModel.getHeat();
+    }
+
+    @Override
+    public HeatModel getHeatModel() {
+        return this.heatModel;
+    }
+
+    @Override
+    public void recalculateCooling() {
+        if (this.level == null) {
+            return;
+        }
+        int heatsinks = 0;
+        int water = 0;
+        for (Direction dir : Direction.values()) {
+            BlockPos neighborPos = this.worldPosition.relative(dir);
+            BlockState neighborState = this.level.getBlockState(neighborPos);
+            if (neighborState.is(ModBlocks.HEATSINK.get())) {
+                heatsinks++;
+            } else {
+                FluidState fluid = this.level.getFluidState(neighborPos);
+                if (fluid.is(FluidTags.WATER) || fluid.is(Fluids.WATER) || fluid.is(Fluids.FLOWING_WATER)) {
+                    water++;
+                }
+            }
+        }
+        this.cachedHeatsinks = heatsinks;
+        this.cachedWaterSides = water;
+        double baseCooling = LogTechConfig.HEAT_COOLING_RATE.get();
+        double sinkRate = LogTechConfig.HEAT_HEATSINK_COOLING.get();
+        double waterRate = LogTechConfig.HEAT_WATER_COOLING.get();
+        this.cachedCooling = DissipationLogic.calculateCooling(baseCooling, heatsinks, water, sinkRate, waterRate);
+        setChanged();
+    }
+
+    @Override
+    public double getCachedCooling() {
+        if (this.cachedCooling < 0.0) {
+            if (this.level != null) {
+                recalculateCooling();
+            } else {
+                return LogTechConfig.HEAT_COOLING_RATE.get();
+            }
+        }
+        return this.cachedCooling;
+    }
+
+    @Override
+    public int getCachedHeatsinks() {
+        return this.cachedHeatsinks;
+    }
+
+    @Override
+    public int getCachedWaterSides() {
+        return this.cachedWaterSides;
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        if (this.level != null && !this.level.isClientSide()) {
+            recalculateCooling();
+        }
     }
 
     @Override
@@ -309,6 +450,46 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
     }
 
     public void serverTick(Level level, BlockPos pos, BlockState state) {
+        io.github.chema280101.logtech.machine.firmware.FirmwareType fw = getFirmwareType();
+
+        if (level.getGameTime() % 20 == 0) {
+            double baseGen = io.github.chema280101.logtech.LogTechConfig.HEAT_BASE_GENERATION.get();
+            double cooling = getCachedCooling();
+
+            double normalSlowdown = io.github.chema280101.logtech.LogTechConfig.HEAT_SLOWDOWN_THRESHOLD.get();
+            double normalOverheat = io.github.chema280101.logtech.LogTechConfig.HEAT_OVERHEAT_THRESHOLD.get();
+            double normalResume = io.github.chema280101.logtech.LogTechConfig.HEAT_RESUME_THRESHOLD.get();
+            double normalSlowdownSpeed = io.github.chema280101.logtech.LogTechConfig.HEAT_SLOWDOWN_SPEED.get();
+
+            double safeOverheat = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_SAFE_OVERHEAT_THRESHOLD.get();
+            double safeResume = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_SAFE_RESUME_THRESHOLD.get();
+
+            this.heatModel.setSlowdownThreshold(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getSlowdownThreshold(fw, normalSlowdown, safeOverheat));
+            this.heatModel.setOverheatThreshold(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getOverheatThreshold(fw, normalOverheat, safeOverheat));
+            this.heatModel.setResumeThreshold(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getResumeThreshold(fw, normalResume, safeResume));
+            this.heatModel.setSlowdownSpeed(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getSlowdownSpeed(fw, normalSlowdownSpeed));
+
+            double ecoHeat = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_ECO_HEAT.get();
+            double turboHeat = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_TURBO_HEAT.get();
+            double heatMult = io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getHeatMultiplier(fw, ecoHeat, turboHeat);
+
+            boolean isWorking = (this.status == MachineStatus.WORKING);
+            this.heatModel.tick(isWorking, baseGen, heatMult, cooling);
+            setChanged();
+        }
+
+        if (this.heatModel.isOverheated()) {
+            if (this.status != MachineStatus.OVERHEATED) {
+                this.status = MachineStatus.OVERHEATED;
+                setChanged();
+            }
+            this.activityCounter.tick(false);
+            return;
+        } else if (this.status == MachineStatus.OVERHEATED) {
+            this.status = MachineStatus.IDLE;
+            setChanged();
+        }
+
         ItemStack inputStack = this.itemHandler.getStackInSlot(INPUT_SLOT);
 
         // 1. Manejo de subproductos pendientes si una salida estuvo llena
@@ -325,6 +506,7 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
                 this.activityCounter.recordItemOut(totalProduced);
                 this.pendingOutputs = null;
                 this.progress = 0;
+                this.progressAccumulator = 0.0;
 
                 ItemStack remaining = this.itemHandler.getStackInSlot(INPUT_SLOT);
                 if (remaining.isEmpty()) {
@@ -351,6 +533,7 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
             if (this.status != MachineStatus.NO_INPUT) {
                 this.status = MachineStatus.NO_INPUT;
                 this.progress = 0;
+                this.progressAccumulator = 0.0;
                 setChanged();
             }
             this.activityCounter.tick(false);
@@ -369,6 +552,7 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
             if (this.status != MachineStatus.NO_INPUT) {
                 this.status = MachineStatus.NO_INPUT;
                 this.progress = 0;
+                this.progressAccumulator = 0.0;
                 setChanged();
             }
             this.activityCounter.tick(false);
@@ -386,8 +570,15 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
             return;
         }
 
-        // 4. Comprobación de energía (80 FE/t)
-        int energyCost = this.cachedRecipe.getEnergyPerTick();
+        // 4. Comprobación de energía
+        int baseEnergyCost = this.cachedRecipe.getEnergyPerTick();
+        int energyCost = io.github.chema280101.logtech.machine.firmware.FirmwareEffects.calculateEnergyCost(
+                baseEnergyCost,
+                fw,
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_ECO_ENERGY.get(),
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_TURBO_ENERGY.get()
+        );
+
         if (this.energyStorage.getEnergyStored() < energyCost) {
             MachineStatus target = this.energyShed ? MachineStatus.SHED : MachineStatus.NO_ENERGY;
             if (this.status != target) {
@@ -398,15 +589,26 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
             return;
         }
 
-        // 5. Máquina activa y trabajando
         if (this.status != MachineStatus.WORKING) {
             this.status = MachineStatus.WORKING;
             setChanged();
         }
 
+        double effectiveSpeed = io.github.chema280101.logtech.machine.firmware.FirmwareEffects.calculateEffectiveSpeed(
+                fw,
+                this.heatModel.getSpeedMultiplier(),
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_ECO_SPEED.get(),
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_TURBO_SPEED.get()
+        );
+
         this.energyStorage.consume(energyCost);
         this.activityCounter.recordEnergyConsumed(energyCost);
-        this.progress++;
+        this.progressAccumulator += effectiveSpeed;
+        int steps = (int) this.progressAccumulator;
+        if (steps > 0) {
+            this.progress += steps;
+            this.progressAccumulator -= steps;
+        }
         this.activityCounter.tick(true);
 
         // 6. Finalización del ciclo de centrifugado
@@ -440,6 +642,7 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
                 this.activityCounter.recordItemIn(1);
                 this.activityCounter.recordItemOut(totalOut);
                 this.progress = 0;
+                this.progressAccumulator = 0.0;
 
                 ItemStack remaining = this.itemHandler.getStackInSlot(INPUT_SLOT);
                 if (remaining.isEmpty()) {
@@ -578,6 +781,10 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
                 Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
             }
         }
+        ItemStack fwStack = this.firmwareHandler.getStackInSlot(0);
+        if (!fwStack.isEmpty()) {
+            Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), fwStack);
+        }
         if (this.pendingOutputs != null) {
             for (ItemStack pending : this.pendingOutputs) {
                 if (!pending.isEmpty()) {
@@ -601,19 +808,23 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
     @Nullable
     @Override
     public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
-        return new CentrifugeMenu(containerId, playerInventory, this.worldPosition, this.itemHandler, this.dataAccess);
+        return new CentrifugeMenu(containerId, playerInventory, this.worldPosition, this.itemHandler, this.firmwareHandler, this.dataAccess);
     }
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.putInt("data_version", 2);
+        tag.putInt("data_version", 4);
         tag.put("Inventory", this.itemHandler.serializeNBT(registries));
+        tag.put("Firmware", this.firmwareHandler.serializeNBT(registries));
         tag.putInt("Energy", this.energyStorage.getEnergyStored());
         tag.putInt("Progress", this.progress);
+        tag.putDouble("ProgressAccumulator", this.progressAccumulator);
         tag.putInt("MaxProgress", this.maxProgress);
         tag.putInt("Status", this.status.ordinal());
         tag.putString("energy_priority", this.energyPriority.name());
+        tag.putDouble("Heat", this.heatModel.getHeat());
+        tag.putBoolean("Overheated", this.heatModel.isOverheated());
 
         if (this.pendingOutputs != null && !this.pendingOutputs.isEmpty()) {
             ListTag pendingList = new ListTag();
@@ -632,10 +843,20 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
         if (tag.contains("Inventory")) {
             this.itemHandler.deserializeNBT(registries, tag.getCompound("Inventory"));
         }
+        if (tag.contains("Firmware")) {
+            this.firmwareHandler.deserializeNBT(registries, tag.getCompound("Firmware"));
+        } else {
+            this.firmwareHandler.setStackInSlot(0, ItemStack.EMPTY);
+        }
         if (tag.contains("Energy")) {
             this.energyStorage.setEnergy(tag.getInt("Energy"));
         }
         this.progress = tag.getInt("Progress");
+        if (tag.contains("ProgressAccumulator")) {
+            this.progressAccumulator = tag.getDouble("ProgressAccumulator");
+        } else {
+            this.progressAccumulator = 0.0;
+        }
         this.maxProgress = tag.contains("MaxProgress") ? tag.getInt("MaxProgress") : 120;
         if (tag.contains("Status")) {
             int ord = tag.getInt("Status");
@@ -647,6 +868,12 @@ public class CentrifugeBlockEntity extends BlockEntity implements MenuProvider, 
             this.energyPriority = EnergyPriority.fromName(tag.getString("energy_priority"));
         } else {
             this.energyPriority = EnergyPriority.NORMAL;
+        }
+        if (tag.contains("Heat")) {
+            this.heatModel.setHeat(tag.getDouble("Heat"));
+        }
+        if (tag.contains("Overheated")) {
+            this.heatModel.setOverheated(tag.getBoolean("Overheated"));
         }
 
         if (tag.contains("PendingOutputs", Tag.TAG_LIST)) {

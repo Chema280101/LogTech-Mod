@@ -7,7 +7,8 @@ public enum RuleConditionType {
     ITEM_COUNT_GREATER("item_greater"),
     ITEM_COUNT_LESS("item_less"),
     TOTAL_SPACE_GREATER("space_greater"),
-    TOTAL_SPACE_LESS("space_less");
+    TOTAL_SPACE_LESS("space_less"),
+    QUARANTINE_GREATER("quarantine_greater");
 
     private final String serializedName;
 

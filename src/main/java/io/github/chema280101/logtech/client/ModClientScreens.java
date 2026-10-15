@@ -17,5 +17,6 @@ public class ModClientScreens {
         event.register(ModMenuTypes.COAL_GENERATOR.get(), CoalGeneratorScreen::new);
         event.register(ModMenuTypes.CENTRIFUGE.get(), CentrifugeScreen::new);
         event.register(ModMenuTypes.WASHER.get(), WasherScreen::new);
+        event.register(ModMenuTypes.DRILL.get(), DrillScreen::new);
     }
 }

@@ -2,6 +2,7 @@ package io.github.chema280101.logtech.storage;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +19,11 @@ public class RuleEngine<K> {
     public static final double SPACE_HYSTERESIS_PERCENT = 2.0;
     public static final double COUNT_HYSTERESIS_RATIO = 0.05;
 
-    public record NetworkState<K>(Map<K, Long> itemAmounts, long totalStored, long totalCapacity) {
+    public record NetworkState<K>(Map<K, Long> itemAmounts, long totalStored, long totalCapacity, long quarantineCount) {
+        public NetworkState(Map<K, Long> itemAmounts, long totalStored, long totalCapacity) {
+            this(itemAmounts, totalStored, totalCapacity, 0L);
+        }
+
         public long getAmount(K key) {
             if (key == null || itemAmounts == null) {
                 return 0L;
@@ -125,6 +130,8 @@ public class RuleEngine<K> {
         Set<K> activeColdItems = new HashSet<>();
         List<RuleNotification<K>> notifications = new ArrayList<>();
         Set<Integer> activeRedstoneChannels = new HashSet<>();
+        Map<K, Long> discardExcessMap = new HashMap<>();
+        Map<K, Long> compactExcessMap = new HashMap<>();
         boolean redstoneActive = false;
 
         for (int i = 0; i < MAX_RULES; i++) {
@@ -150,7 +157,10 @@ public class RuleEngine<K> {
                     margin = 0L;
                 }
 
-                if (cond == RuleConditionType.ITEM_COUNT_GREATER) {
+                if (rule.getAction() == RuleAction.DISCARD_EXCESS || rule.getAction() == RuleAction.COMPACT) {
+                    // Descartar excedente y Compactar: límite estricto sin histéresis hacia abajo para no dejar menos de N
+                    nowActive = (currentCount > threshold);
+                } else if (cond == RuleConditionType.ITEM_COUNT_GREATER) {
                     if (!wasActive) {
                         nowActive = (currentCount > threshold);
                     } else {
@@ -164,6 +174,18 @@ public class RuleEngine<K> {
                         // Con histéresis: se mantiene activo hasta que suba por encima de umbral + margen
                         nowActive = (currentCount < threshold + margin);
                     }
+                }
+            } else if (cond == RuleConditionType.QUARANTINE_GREATER) {
+                long currentQuarantine = state != null ? state.quarantineCount() : 0L;
+                long margin = Math.max(1L, (long) Math.floor(threshold * COUNT_HYSTERESIS_RATIO));
+                if (threshold == 0L) {
+                    margin = 0L;
+                }
+
+                if (!wasActive) {
+                    nowActive = (currentQuarantine > threshold);
+                } else {
+                    nowActive = (currentQuarantine > threshold - margin);
                 }
             } else { // Condición de porcentaje de espacio usado
                 double currentSpace = state != null ? state.getUsedSpacePercentage() : 0.0;
@@ -195,6 +217,24 @@ public class RuleEngine<K> {
                             activeColdItems.add(rule.getItem());
                         }
                     }
+                    case DISCARD_EXCESS -> {
+                        if (rule.getItem() != null) {
+                            long currentCount = state != null ? state.getAmount(rule.getItem()) : 0L;
+                            if (currentCount > threshold) {
+                                long excess = currentCount - threshold;
+                                discardExcessMap.merge(rule.getItem(), excess, Math::max);
+                            }
+                        }
+                    }
+                    case COMPACT -> {
+                        if (rule.getItem() != null) {
+                            long currentCount = state != null ? state.getAmount(rule.getItem()) : 0L;
+                            if (currentCount > threshold) {
+                                long excess = currentCount - threshold;
+                                compactExcessMap.merge(rule.getItem(), excess, Math::max);
+                            }
+                        }
+                    }
                     case NOTIFY -> {
                         // Disparar aviso exactamente una vez al activarse
                         if (!rState.notificationFired) {
@@ -217,7 +257,9 @@ public class RuleEngine<K> {
                 Collections.unmodifiableSet(activeColdItems),
                 Collections.unmodifiableList(notifications),
                 redstoneActive,
-                Collections.unmodifiableSet(activeRedstoneChannels)
+                Collections.unmodifiableSet(activeRedstoneChannels),
+                Collections.unmodifiableMap(discardExcessMap),
+                Collections.unmodifiableMap(compactExcessMap)
         );
     }
 

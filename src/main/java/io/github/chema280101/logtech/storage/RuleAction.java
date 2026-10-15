@@ -9,7 +9,9 @@ public enum RuleAction {
     REDSTONE_SIGNAL("redstone_signal", 1),
     REDSTONE_2("redstone_2", 2),
     REDSTONE_3("redstone_3", 3),
-    REDSTONE_4("redstone_4", 4);
+    REDSTONE_4("redstone_4", 4),
+    DISCARD_EXCESS("discard_excess", 0),
+    COMPACT("compact", 0);
 
     public static final RuleAction REDSTONE_1 = REDSTONE_SIGNAL;
 
@@ -34,7 +36,7 @@ public enum RuleAction {
     }
 
     public boolean requiresItem() {
-        return this == MOVE_TO_COLD;
+        return this == MOVE_TO_COLD || this == DISCARD_EXCESS || this == COMPACT;
     }
 
     public static RuleAction fromSerialized(String name) {

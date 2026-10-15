@@ -1,10 +1,34 @@
 {
   "variants": {
-    "lit=false": {
+    "facing=east,lit=false": {
+      "model": "logtech:block/coal_generator",
+      "y": 90
+    },
+    "facing=east,lit=true": {
+      "model": "logtech:block/coal_generator_active",
+      "y": 90
+    },
+    "facing=north,lit=false": {
       "model": "logtech:block/coal_generator"
     },
-    "lit=true": {
+    "facing=north,lit=true": {
       "model": "logtech:block/coal_generator_active"
+    },
+    "facing=south,lit=false": {
+      "model": "logtech:block/coal_generator",
+      "y": 180
+    },
+    "facing=south,lit=true": {
+      "model": "logtech:block/coal_generator_active",
+      "y": 180
+    },
+    "facing=west,lit=false": {
+      "model": "logtech:block/coal_generator",
+      "y": 270
+    },
+    "facing=west,lit=true": {
+      "model": "logtech:block/coal_generator_active",
+      "y": 270
     }
   }
 }

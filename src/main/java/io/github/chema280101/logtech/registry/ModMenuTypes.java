@@ -29,4 +29,7 @@ public class ModMenuTypes {
 
     public static final DeferredHolder<MenuType<?>, MenuType<io.github.chema280101.logtech.machine.WasherMenu>> WASHER =
             MENUS.register("washer", () -> IMenuTypeExtension.create(io.github.chema280101.logtech.machine.WasherMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<io.github.chema280101.logtech.machine.DrillMenu>> DRILL =
+            MENUS.register("drill", () -> IMenuTypeExtension.create(io.github.chema280101.logtech.machine.DrillMenu::new));
 }

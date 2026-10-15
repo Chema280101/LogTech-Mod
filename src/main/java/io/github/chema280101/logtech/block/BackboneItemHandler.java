@@ -68,12 +68,8 @@ public class BackboneItemHandler implements IItemHandler {
             return stack;
         }
 
-        if (!coreBe.isPowered() || coreBe.isOverloaded()) {
-            return stack;
-        }
-
         ItemKey key = ItemKey.of(stack);
-        long inserted = coreBe.insert(key, stack.getCount(), simulate);
+        long inserted = coreBe.insertFromBackbone(key, stack.getCount(), simulate);
         if (inserted <= 0) {
             return stack;
         }

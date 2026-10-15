@@ -92,4 +92,11 @@ public class ModBlocks {
             io.github.chema280101.logtech.machine.WasherBlock::new,
             BlockBehaviour.Properties.of().destroyTime(3.0f).explosionResistance(6.0f)
     );
+
+    // Disipador: bloque pasivo de disipacion termica adyacente a maquinas
+    public static final DeferredBlock<io.github.chema280101.logtech.block.HeatsinkBlock> HEATSINK = BLOCKS.registerBlock(
+            "heatsink",
+            io.github.chema280101.logtech.block.HeatsinkBlock::new,
+            BlockBehaviour.Properties.of().destroyTime(2.0f).explosionResistance(4.0f).sound(net.minecraft.world.level.block.SoundType.METAL)
+    );
 }

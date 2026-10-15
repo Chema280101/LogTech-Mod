@@ -18,18 +18,18 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
 public class WasherMenu extends AbstractContainerMenu implements PriorityConfigurableMenu {
-    public static final int DATA_COUNT = 12;
+    public static final int DATA_COUNT = 14;
 
     private final BlockPos pos;
     private final ContainerData data;
 
     // Constructor cliente
     public WasherMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buf) {
-        this(containerId, playerInventory, buf.readBlockPos(), new ItemStackHandler(WasherBlockEntity.TOTAL_SLOTS), new SimpleContainerData(DATA_COUNT));
+        this(containerId, playerInventory, buf.readBlockPos(), new ItemStackHandler(WasherBlockEntity.TOTAL_SLOTS), new ItemStackHandler(1), new SimpleContainerData(DATA_COUNT));
     }
 
     // Constructor servidor
-    public WasherMenu(int containerId, Inventory playerInventory, BlockPos pos, IItemHandler itemHandler, ContainerData data) {
+    public WasherMenu(int containerId, Inventory playerInventory, BlockPos pos, IItemHandler itemHandler, IItemHandler firmwareHandler, ContainerData data) {
         super(ModMenuTypes.WASHER.get(), containerId);
         this.pos = pos;
         this.data = data;
@@ -53,6 +53,19 @@ public class WasherMenu extends AbstractContainerMenu implements PriorityConfigu
             @Override
             public boolean mayPlace(ItemStack stack) {
                 return false;
+            }
+        });
+
+        // Ranura 3: Firmware (solo chips de firmware, máximo 1)
+        this.addSlot(new SlotItemHandler(firmwareHandler, 0, 56, 15) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return stack.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem;
+            }
+
+            @Override
+            public int getMaxStackSize() {
+                return 1;
             }
         });
 
@@ -119,6 +132,14 @@ public class WasherMenu extends AbstractContainerMenu implements PriorityConfigu
         this.data.set(11, priority != null ? priority.ordinal() : EnergyPriority.NORMAL.ordinal());
     }
 
+    public int getHeat() {
+        return this.data.get(12);
+    }
+
+    public double getCooling() {
+        return this.data.get(13) / 10.0;
+    }
+
     @Override
     public boolean stillValid(Player player) {
         return stillValid(ContainerLevelAccess.create(player.level(), this.pos), player, ModBlocks.WASHER.get());
@@ -132,29 +153,33 @@ public class WasherMenu extends AbstractContainerMenu implements PriorityConfigu
             ItemStack stackInSlot = slot.getItem();
             itemstack = stackInSlot.copy();
 
-            // Índices: 0=Entrada, 1..2=Salidas, 3..29=Inventario jugador, 30..38=Hotbar
+            // Índices: 0=Entrada, 1..2=Salidas, 3=Firmware, 4..30=Inventario jugador, 31..39=Hotbar
             if (index == WasherBlockEntity.SLOT_OUTPUT_DUST || index == WasherBlockEntity.SLOT_OUTPUT_SLUDGE) {
                 // Desde salidas hacia el inventario del jugador
-                if (!this.moveItemStackTo(stackInSlot, 3, 39, true)) {
+                if (!this.moveItemStackTo(stackInSlot, 4, 40, true)) {
                     return ItemStack.EMPTY;
                 }
                 slot.onQuickCraft(stackInSlot, itemstack);
-            } else if (index == WasherBlockEntity.SLOT_INPUT) {
-                // Desde entrada hacia el inventario del jugador
-                if (!this.moveItemStackTo(stackInSlot, 3, 39, false)) {
+            } else if (index == WasherBlockEntity.SLOT_INPUT || index == 3) {
+                // Desde entrada o firmware hacia el inventario del jugador
+                if (!this.moveItemStackTo(stackInSlot, 4, 40, false)) {
                     return ItemStack.EMPTY;
                 }
             } else {
-                // Desde inventario del jugador hacia la máquina (ranura de entrada 0)
-                if (!this.moveItemStackTo(stackInSlot, 0, 1, false)) {
-                    if (index >= 3 && index < 30) {
+                // Desde inventario del jugador hacia la máquina
+                if (stackInSlot.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem) {
+                    if (!this.moveItemStackTo(stackInSlot, 3, 4, false)) {
+                        return ItemStack.EMPTY;
+                    }
+                } else if (!this.moveItemStackTo(stackInSlot, 0, 1, false)) {
+                    if (index >= 4 && index < 31) {
                         // De inventario principal a hotbar
-                        if (!this.moveItemStackTo(stackInSlot, 30, 39, false)) {
+                        if (!this.moveItemStackTo(stackInSlot, 31, 40, false)) {
                             return ItemStack.EMPTY;
                         }
-                    } else if (index >= 30 && index < 39) {
+                    } else if (index >= 31 && index < 40) {
                         // De hotbar a inventario principal
-                        if (!this.moveItemStackTo(stackInSlot, 3, 30, false)) {
+                        if (!this.moveItemStackTo(stackInSlot, 4, 31, false)) {
                             return ItemStack.EMPTY;
                         }
                     }

@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "bottom": "logtech:block/machine_bottom",
+    "side": "logtech:block/heatsink_side",
+    "top": "logtech:block/heatsink_top"
+  }
+}

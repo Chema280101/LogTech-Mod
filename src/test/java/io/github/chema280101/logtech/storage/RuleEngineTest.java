@@ -272,4 +272,157 @@ class RuleEngineTest {
         assertFalse(res4.isChannelActive(2));
         assertTrue(res4.isChannelActive(4));
     }
+
+    @Test
+    @DisplayName("Criterio: hierro mayor que 20000 → descartar excedente calcula el sobrante exacto por encima de N sin parpadeo")
+    void testDiscardExcessRuleCalculatesExcessAndLeavesExactThreshold() {
+        String iron = "minecraft:iron_ingot";
+        // Regla: hierro > 20000 -> descartar excedente
+        AutomationRule<String> rule = new AutomationRule<>(
+                0,
+                iron,
+                RuleConditionType.ITEM_COUNT_GREATER,
+                20000L,
+                RuleAction.DISCARD_EXCESS,
+                true
+        );
+        engine.setRule(0, rule);
+
+        // Caso 1: hierro en 20500 -> excedente = 500
+        Map<String, Long> items = Map.of(iron, 20500L);
+        RuleEvaluationResult<String> res1 = engine.evaluate(new RuleEngine.NetworkState<>(items, 20500L, 100000L));
+        assertEquals(500L, res1.getExcessToDiscard(iron));
+        assertTrue(engine.isRuleActive(0));
+
+        // Caso 2: tras descartar el excedente en la red, el hierro queda exactamente en 20000
+        // En el siguiente ciclo, no supera 20000 -> excedente = 0, regla inactiva (sin parpadeo)
+        items = Map.of(iron, 20000L);
+        RuleEvaluationResult<String> res2 = engine.evaluate(new RuleEngine.NetworkState<>(items, 20000L, 100000L));
+        assertEquals(0L, res2.getExcessToDiscard(iron));
+        assertFalse(engine.isRuleActive(0));
+
+        // Caso 3: entran 64 ítems nuevos -> 20064 -> excedente = 64
+        items = Map.of(iron, 20064L);
+        RuleEvaluationResult<String> res3 = engine.evaluate(new RuleEngine.NetworkState<>(items, 20064L, 100000L));
+        assertEquals(64L, res3.getExcessToDiscard(iron));
+        assertTrue(engine.isRuleActive(0));
+    }
+
+    @Test
+    @DisplayName("QUARANTINE_GREATER: se activa cuando los ítems en cuarentena superan el umbral")
+    void testQuarantineGreaterActivates() {
+        AutomationRule<String> rule = new AutomationRule<>(
+                0,
+                null,
+                RuleConditionType.QUARANTINE_GREATER,
+                100L,
+                RuleAction.REDSTONE_SIGNAL,
+                true
+        );
+        engine.setRule(0, rule);
+
+        // Caso 1: 100 ítems en cuarentena (justo en umbral, no mayor estricto)
+        RuleEvaluationResult<String> res1 = engine.evaluate(new RuleEngine.NetworkState<>(Map.of(), 5000L, 10000L, 100L));
+        assertFalse(res1.redstoneSignalActive());
+        assertFalse(engine.isRuleActive(0));
+
+        // Caso 2: 101 ítems en cuarentena -> supera umbral y se activa
+        RuleEvaluationResult<String> res2 = engine.evaluate(new RuleEngine.NetworkState<>(Map.of(), 5000L, 10000L, 101L));
+        assertTrue(res2.redstoneSignalActive());
+        assertTrue(engine.isRuleActive(0));
+        assertTrue(engine.isRedstoneSignalActive(1));
+    }
+
+    @Test
+    @DisplayName("QUARANTINE_GREATER: histéresis anti-parpadeo evita conmutaciones rápidas en el límite")
+    void testQuarantineGreaterHysteresis() {
+        AutomationRule<String> rule = new AutomationRule<>(
+                0,
+                null,
+                RuleConditionType.QUARANTINE_GREATER,
+                100L,
+                RuleAction.NOTIFY,
+                true
+        );
+        engine.setRule(0, rule);
+
+        // Umbral 100: margen 5% = 5. Límite de desconexión = 95.
+        // 1. Activar con 105 ítems
+        RuleEvaluationResult<String> r1 = engine.evaluate(new RuleEngine.NetworkState<>(Map.of(), 0L, 1000L, 105L));
+        assertTrue(engine.isRuleActive(0));
+        assertEquals(1, r1.notifications().size());
+
+        // 2. Caer a 98 (por encima de 95) -> debe mantenerse activa por histéresis
+        RuleEvaluationResult<String> r2 = engine.evaluate(new RuleEngine.NetworkState<>(Map.of(), 0L, 1000L, 98L));
+        assertTrue(engine.isRuleActive(0));
+        assertTrue(r2.notifications().isEmpty(), "No debe repetir notificación mientras siga activa");
+
+        // 3. Caer a 94 (por debajo de 95) -> se desactiva
+        RuleEvaluationResult<String> r3 = engine.evaluate(new RuleEngine.NetworkState<>(Map.of(), 0L, 1000L, 94L));
+        assertFalse(engine.isRuleActive(0));
+
+        // 4. Subir a 99 (no supera 100) -> permanece inactiva
+        RuleEvaluationResult<String> r4 = engine.evaluate(new RuleEngine.NetworkState<>(Map.of(), 0L, 1000L, 99L));
+        assertFalse(engine.isRuleActive(0));
+
+        // 5. Subir a 101 -> se vuelve a activar y rearma notificación
+        RuleEvaluationResult<String> r5 = engine.evaluate(new RuleEngine.NetworkState<>(Map.of(), 0L, 1000L, 101L));
+        assertTrue(engine.isRuleActive(0));
+        assertEquals(1, r5.notifications().size());
+    }
+
+    @Test
+    @DisplayName("COMPACT: calcula el excedente exacto por encima de N y se inactiva si está en el umbral")
+    void testCompactExcessEvaluation() {
+        String iron = "minecraft:iron_ingot";
+        AutomationRule<String> rule = new AutomationRule<>(
+                0,
+                iron,
+                RuleConditionType.ITEM_COUNT_GREATER,
+                1000L,
+                RuleAction.COMPACT,
+                true
+        );
+        engine.setRule(0, rule);
+
+        // Con 5 000 lingotes, el excedente a compactar es 4 000
+        Map<String, Long> items = Map.of(iron, 5000L);
+        RuleEvaluationResult<String> r1 = engine.evaluate(new RuleEngine.NetworkState<>(items, 5000L, 10000L));
+        assertTrue(engine.isRuleActive(0));
+        assertEquals(4000L, r1.getExcessToCompact(iron));
+
+        // Con 1 000 lingotes (justo en el umbral), no hay excedente y se desactiva
+        items = Map.of(iron, 1000L);
+        RuleEvaluationResult<String> r2 = engine.evaluate(new RuleEngine.NetworkState<>(items, 1000L, 10000L));
+        assertFalse(engine.isRuleActive(0));
+        assertEquals(0L, r2.getExcessToCompact(iron));
+
+        // Con 999 lingotes, no hay excedente
+        items = Map.of(iron, 999L);
+        RuleEvaluationResult<String> r3 = engine.evaluate(new RuleEngine.NetworkState<>(items, 999L, 10000L));
+        assertFalse(engine.isRuleActive(0));
+        assertEquals(0L, r3.getExcessToCompact(iron));
+    }
+
+    @Test
+    @DisplayName("COMPACT: solo es válida con ITEM_COUNT_GREATER y con ítem configurado")
+    void testCompactRuleValidity() {
+        String iron = "minecraft:iron_ingot";
+
+        // Válida: ITEM_COUNT_GREATER + ítem
+        AutomationRule<String> validRule = new AutomationRule<>(0, iron, RuleConditionType.ITEM_COUNT_GREATER, 100L, RuleAction.COMPACT, true);
+        assertTrue(validRule.isValid());
+
+        // Inválida: condición ITEM_COUNT_LESS
+        AutomationRule<String> invalidCond = new AutomationRule<>(0, iron, RuleConditionType.ITEM_COUNT_LESS, 100L, RuleAction.COMPACT, true);
+        assertFalse(invalidCond.isValid(), "COMPACT solo tiene sentido cuando el ítem supera un umbral");
+
+        // Inválida: condición de espacio
+        AutomationRule<String> invalidSpace = new AutomationRule<>(0, iron, RuleConditionType.TOTAL_SPACE_GREATER, 50L, RuleAction.COMPACT, true);
+        assertFalse(invalidSpace.isValid(), "COMPACT requiere condición sobre cantidad de ítem");
+
+        // Inválida: ítem nulo
+        AutomationRule<String> invalidItem = new AutomationRule<>(0, null, RuleConditionType.ITEM_COUNT_GREATER, 100L, RuleAction.COMPACT, true);
+        assertFalse(invalidItem.isValid(), "COMPACT requiere un ítem asignado");
+    }
 }

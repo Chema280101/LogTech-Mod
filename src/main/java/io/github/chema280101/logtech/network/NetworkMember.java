@@ -60,4 +60,18 @@ public interface NetworkMember {
 
     default void setEnergyShed(boolean shed) {
     }
+
+    /**
+     * Devuelve la temperatura actual de la máquina (0 a 100 °C).
+     */
+    default double getHeat() {
+        return 0.0;
+    }
+
+    /**
+     * Devuelve el tipo de firmware instalado en la máquina (NONE si no tiene chip).
+     */
+    default io.github.chema280101.logtech.machine.firmware.FirmwareType getFirmwareType() {
+        return io.github.chema280101.logtech.machine.firmware.FirmwareType.NONE;
+    }
 }

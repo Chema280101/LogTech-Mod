@@ -24,6 +24,16 @@ public class ModDataComponents {
                     .persistent(com.mojang.serialization.Codec.intRange(1, 5))
                     .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<net.minecraft.world.item.Item>> FIRMWARE_FILTER =
+            DATA_COMPONENTS.registerComponentType("firmware_filter", builder -> builder
+                    .persistent(net.minecraft.core.registries.BuiltInRegistries.ITEM.byNameCodec())
+                    .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.registry(net.minecraft.core.registries.Registries.ITEM)));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<io.github.chema280101.logtech.block.ConfigPackage>> CONFIG_DATA =
+            DATA_COMPONENTS.registerComponentType("config_data", builder -> builder
+                    .persistent(io.github.chema280101.logtech.block.ConfigPackage.CODEC)
+                    .networkSynchronized(io.github.chema280101.logtech.block.ConfigPackage.STREAM_CODEC));
+
     public static int getPurity(net.minecraft.world.item.ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return 1;
@@ -34,6 +44,23 @@ public class ModDataComponents {
     public static void setPurity(net.minecraft.world.item.ItemStack stack, int purity) {
         if (stack != null && !stack.isEmpty()) {
             stack.set(PURITY.get(), Math.max(1, Math.min(5, purity)));
+        }
+    }
+
+    public static net.minecraft.world.item.Item getFirmwareFilter(net.minecraft.world.item.ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return null;
+        }
+        return stack.get(FIRMWARE_FILTER.get());
+    }
+
+    public static void setFirmwareFilter(net.minecraft.world.item.ItemStack stack, net.minecraft.world.item.Item item) {
+        if (stack != null && !stack.isEmpty()) {
+            if (item != null) {
+                stack.set(FIRMWARE_FILTER.get(), item);
+            } else {
+                stack.remove(FIRMWARE_FILTER.get());
+            }
         }
     }
 }

@@ -3,14 +3,18 @@ package io.github.chema280101.logtech.storage;
 import java.util.Locale;
 import net.minecraft.world.item.ItemStack;
 
-public record TerminalItemEntry(ItemStack stack, long amount, long hotAmount, long coldAmount, ItemPinMode pinMode) {
+public record TerminalItemEntry(ItemStack stack, long amount, long hotAmount, long coldAmount, ItemPinMode pinMode, long ratePerMinute) {
+
+    public TerminalItemEntry(ItemStack stack, long amount, long hotAmount, long coldAmount, ItemPinMode pinMode) {
+        this(stack, amount, hotAmount, coldAmount, pinMode, 0L);
+    }
 
     public TerminalItemEntry(ItemStack stack, long amount, long hotAmount, long coldAmount) {
-        this(stack, amount, hotAmount, coldAmount, ItemPinMode.AUTO);
+        this(stack, amount, hotAmount, coldAmount, ItemPinMode.AUTO, 0L);
     }
 
     public TerminalItemEntry(ItemStack stack, long amount) {
-        this(stack, amount, amount, 0L, ItemPinMode.AUTO);
+        this(stack, amount, amount, 0L, ItemPinMode.AUTO, 0L);
     }
 
     /**

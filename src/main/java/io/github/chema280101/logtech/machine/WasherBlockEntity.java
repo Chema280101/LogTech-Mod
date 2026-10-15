@@ -27,13 +27,17 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.tags.FluidTags;
+import io.github.chema280101.logtech.registry.ModBlocks;
+import io.github.chema280101.logtech.LogTechConfig;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
-public class WasherBlockEntity extends BlockEntity implements MenuProvider, NetworkMember {
+public class WasherBlockEntity extends BlockEntity implements MenuProvider, NetworkMember, HeatDissipatingMachine, MachineConfigurable {
     public static final int ENERGY_CAPACITY = 10_000;
     public static final int ENERGY_MAX_RECEIVE = 100;
     public static final int WATER_CAPACITY = 4_000;
@@ -62,6 +66,23 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
         }
     };
 
+    private final ItemStackHandler firmwareHandler = new ItemStackHandler(1) {
+        @Override
+        protected void onContentsChanged(int slot) {
+            setChanged();
+        }
+
+        @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            return stack.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem;
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            return 1;
+        }
+    };
+
     private final FluidTank fluidTank = new FluidTank(WATER_CAPACITY, fluidStack -> fluidStack.is(Fluids.WATER)) {
         @Override
         protected void onContentsChanged() {
@@ -77,10 +98,15 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
     );
 
     private int progress = 0;
+    private double progressAccumulator = 0.0;
     private int maxProgress = 80;
     private MachineStatus status = MachineStatus.NO_INPUT;
     private EnergyPriority energyPriority = EnergyPriority.NORMAL;
     private boolean energyShed = false;
+    private final HeatModel heatModel = new HeatModel();
+    private double cachedCooling = -1.0;
+    private int cachedHeatsinks = 0;
+    private int cachedWaterSides = 0;
 
     private WashingRecipe cachedRecipe = null;
     private Item lastInputItem = Items.AIR;
@@ -101,6 +127,8 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
                 case 9 -> WasherBlockEntity.this.fluidTank.getCapacity() & 0xFFFF;
                 case 10 -> (WasherBlockEntity.this.fluidTank.getCapacity() >> 16) & 0xFFFF;
                 case 11 -> WasherBlockEntity.this.energyPriority.ordinal();
+                case 12 -> (int) Math.round(WasherBlockEntity.this.heatModel.getHeat());
+                case 13 -> (int) Math.round(WasherBlockEntity.this.getCachedCooling() * 10.0);
                 default -> 0;
             };
         }
@@ -119,12 +147,13 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
                     WasherBlockEntity.this.energyPriority = EnergyPriority.fromOrdinal(value);
                     WasherBlockEntity.this.setChanged();
                 }
+                case 12 -> WasherBlockEntity.this.heatModel.setHeat(value);
             }
         }
 
         @Override
         public int getCount() {
-            return 12;
+            return 14;
         }
     };
 
@@ -163,6 +192,16 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
         }
     };
 
+    private boolean canExtractAutomated(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+        io.github.chema280101.logtech.machine.firmware.FirmwareType fw = getFirmwareType();
+        if (fw != io.github.chema280101.logtech.machine.firmware.FirmwareType.SELECTIVE) return true;
+        ItemStack fwStack = this.firmwareHandler.getStackInSlot(0);
+        net.minecraft.world.item.Item filterItem = io.github.chema280101.logtech.registry.ModDataComponents.getFirmwareFilter(fwStack);
+        if (filterItem == null) return true;
+        return stack.getItem() == filterItem;
+    }
+
     private final IItemHandler outputHandler = new IItemHandler() {
         @Override
         public int getSlots() {
@@ -172,7 +211,10 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
         @Override
         public ItemStack getStackInSlot(int slot) {
             if (slot == SLOT_OUTPUT_DUST || slot == SLOT_OUTPUT_SLUDGE) {
-                return itemHandler.getStackInSlot(slot);
+                ItemStack stack = itemHandler.getStackInSlot(slot);
+                if (canExtractAutomated(stack)) {
+                    return stack;
+                }
             }
             return ItemStack.EMPTY;
         }
@@ -185,6 +227,10 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
             if (slot == SLOT_OUTPUT_DUST || slot == SLOT_OUTPUT_SLUDGE) {
+                ItemStack stack = itemHandler.getStackInSlot(slot);
+                if (!canExtractAutomated(stack)) {
+                    return ItemStack.EMPTY;
+                }
                 return itemHandler.extractItem(slot, amount, simulate);
             }
             return ItemStack.EMPTY;
@@ -207,6 +253,19 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
 
     public ItemStackHandler getItemHandler() {
         return this.itemHandler;
+    }
+
+    public ItemStackHandler getFirmwareHandler() {
+        return this.firmwareHandler;
+    }
+
+    @Override
+    public io.github.chema280101.logtech.machine.firmware.FirmwareType getFirmwareType() {
+        ItemStack stack = this.firmwareHandler.getStackInSlot(0);
+        if (stack.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem fw) {
+            return fw.getFirmwareType();
+        }
+        return io.github.chema280101.logtech.machine.firmware.FirmwareType.NONE;
     }
 
     public IItemHandler getItemHandler(@Nullable Direction side) {
@@ -238,7 +297,85 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
 
     @Override
     public int requestedEnergy() {
-        return Math.max(0, this.energyStorage.getMaxEnergyStored() - this.energyStorage.getEnergyStored());
+        if (this.heatModel.isOverheated()) {
+            return 0;
+        }
+        int deficit = Math.max(0, this.energyStorage.getMaxEnergyStored() - this.energyStorage.getEnergyStored());
+        return io.github.chema280101.logtech.machine.firmware.FirmwareEffects.calculateRequestedEnergy(
+                deficit,
+                this.heatModel.getSpeedMultiplier(),
+                getFirmwareType(),
+                LogTechConfig.FIRMWARE_ECO_ENERGY.get(),
+                LogTechConfig.FIRMWARE_TURBO_ENERGY.get()
+        );
+    }
+
+    @Override
+    public double getHeat() {
+        return this.heatModel.getHeat();
+    }
+
+    @Override
+    public HeatModel getHeatModel() {
+        return this.heatModel;
+    }
+
+    @Override
+    public void recalculateCooling() {
+        if (this.level == null) {
+            return;
+        }
+        int heatsinks = 0;
+        int water = 0;
+        for (Direction dir : Direction.values()) {
+            BlockPos neighborPos = this.worldPosition.relative(dir);
+            BlockState neighborState = this.level.getBlockState(neighborPos);
+            if (neighborState.is(ModBlocks.HEATSINK.get())) {
+                heatsinks++;
+            } else {
+                FluidState fluid = this.level.getFluidState(neighborPos);
+                if (fluid.is(FluidTags.WATER) || fluid.is(Fluids.WATER) || fluid.is(Fluids.FLOWING_WATER)) {
+                    water++;
+                }
+            }
+        }
+        this.cachedHeatsinks = heatsinks;
+        this.cachedWaterSides = water;
+        double baseCooling = LogTechConfig.HEAT_COOLING_RATE.get();
+        double sinkRate = LogTechConfig.HEAT_HEATSINK_COOLING.get();
+        double waterRate = LogTechConfig.HEAT_WATER_COOLING.get();
+        this.cachedCooling = DissipationLogic.calculateCooling(baseCooling, heatsinks, water, sinkRate, waterRate);
+        setChanged();
+    }
+
+    @Override
+    public double getCachedCooling() {
+        if (this.cachedCooling < 0.0) {
+            if (this.level != null) {
+                recalculateCooling();
+            } else {
+                return LogTechConfig.HEAT_COOLING_RATE.get();
+            }
+        }
+        return this.cachedCooling;
+    }
+
+    @Override
+    public int getCachedHeatsinks() {
+        return this.cachedHeatsinks;
+    }
+
+    @Override
+    public int getCachedWaterSides() {
+        return this.cachedWaterSides;
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        if (this.level != null && !this.level.isClientSide()) {
+            recalculateCooling();
+        }
     }
 
     @Override
@@ -321,11 +458,52 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
     }
 
     public void serverTick(Level level, BlockPos pos, BlockState state) {
+        io.github.chema280101.logtech.machine.firmware.FirmwareType fw = getFirmwareType();
+
+        if (level.getGameTime() % 20 == 0) {
+            double baseGen = io.github.chema280101.logtech.LogTechConfig.HEAT_BASE_GENERATION.get();
+            double cooling = getCachedCooling();
+
+            double normalSlowdown = io.github.chema280101.logtech.LogTechConfig.HEAT_SLOWDOWN_THRESHOLD.get();
+            double normalOverheat = io.github.chema280101.logtech.LogTechConfig.HEAT_OVERHEAT_THRESHOLD.get();
+            double normalResume = io.github.chema280101.logtech.LogTechConfig.HEAT_RESUME_THRESHOLD.get();
+            double normalSlowdownSpeed = io.github.chema280101.logtech.LogTechConfig.HEAT_SLOWDOWN_SPEED.get();
+
+            double safeOverheat = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_SAFE_OVERHEAT_THRESHOLD.get();
+            double safeResume = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_SAFE_RESUME_THRESHOLD.get();
+
+            this.heatModel.setSlowdownThreshold(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getSlowdownThreshold(fw, normalSlowdown, safeOverheat));
+            this.heatModel.setOverheatThreshold(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getOverheatThreshold(fw, normalOverheat, safeOverheat));
+            this.heatModel.setResumeThreshold(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getResumeThreshold(fw, normalResume, safeResume));
+            this.heatModel.setSlowdownSpeed(io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getSlowdownSpeed(fw, normalSlowdownSpeed));
+
+            double ecoHeat = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_ECO_HEAT.get();
+            double turboHeat = io.github.chema280101.logtech.LogTechConfig.FIRMWARE_TURBO_HEAT.get();
+            double heatMult = io.github.chema280101.logtech.machine.firmware.FirmwareEffects.getHeatMultiplier(fw, ecoHeat, turboHeat);
+
+            boolean isWorking = (this.status == MachineStatus.WORKING);
+            this.heatModel.tick(isWorking, baseGen, heatMult, cooling);
+            setChanged();
+        }
+
+        if (this.heatModel.isOverheated()) {
+            if (this.status != MachineStatus.OVERHEATED) {
+                this.status = MachineStatus.OVERHEATED;
+                setChanged();
+            }
+            this.activityCounter.tick(false);
+            return;
+        } else if (this.status == MachineStatus.OVERHEATED) {
+            this.status = MachineStatus.IDLE;
+            setChanged();
+        }
+
         ItemStack inputStack = this.itemHandler.getStackInSlot(SLOT_INPUT);
         if (inputStack.isEmpty() || (inputStack.has(ModDataComponents.PURITY.get()) && ModDataComponents.getPurity(inputStack) >= 5)) {
             if (this.status != MachineStatus.NO_INPUT) {
                 this.status = MachineStatus.NO_INPUT;
                 this.progress = 0;
+                this.progressAccumulator = 0.0;
                 setChanged();
             }
             this.activityCounter.tick(false);
@@ -344,6 +522,7 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
             if (this.status != MachineStatus.NO_INPUT) {
                 this.status = MachineStatus.NO_INPUT;
                 this.progress = 0;
+                this.progressAccumulator = 0.0;
                 setChanged();
             }
             this.activityCounter.tick(false);
@@ -383,9 +562,16 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
             return;
         }
 
-        int energyCost = this.cachedRecipe != null && this.cachedRecipe.getEnergyPerTick() > 0
+        int baseEnergyCost = this.cachedRecipe != null && this.cachedRecipe.getEnergyPerTick() > 0
                 ? this.cachedRecipe.getEnergyPerTick()
                 : io.github.chema280101.logtech.LogTechConfig.WASHER_ENERGY_CONSUMPTION.get();
+        int energyCost = io.github.chema280101.logtech.machine.firmware.FirmwareEffects.calculateEnergyCost(
+                baseEnergyCost,
+                fw,
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_ECO_ENERGY.get(),
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_TURBO_ENERGY.get()
+        );
+
         if (this.energyStorage.getEnergyStored() < energyCost) {
             MachineStatus target = this.energyShed ? MachineStatus.SHED : MachineStatus.NO_ENERGY;
             if (this.status != target) {
@@ -401,9 +587,21 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
             setChanged();
         }
 
+        double effectiveSpeed = io.github.chema280101.logtech.machine.firmware.FirmwareEffects.calculateEffectiveSpeed(
+                fw,
+                this.heatModel.getSpeedMultiplier(),
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_ECO_SPEED.get(),
+                io.github.chema280101.logtech.LogTechConfig.FIRMWARE_TURBO_SPEED.get()
+        );
+
         this.energyStorage.consume(energyCost);
         this.activityCounter.recordEnergyConsumed(energyCost);
-        this.progress++;
+        this.progressAccumulator += effectiveSpeed;
+        int steps = (int) this.progressAccumulator;
+        if (steps > 0) {
+            this.progress += steps;
+            this.progressAccumulator -= steps;
+        }
         this.activityCounter.tick(true);
 
         if (this.progress >= this.maxProgress) {
@@ -425,6 +623,7 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
             this.activityCounter.recordItemIn(1);
             this.activityCounter.recordItemOut(dustOutput.getCount() + sludgeOutput.getCount());
             this.progress = 0;
+            this.progressAccumulator = 0.0;
 
             ItemStack remainingInput = this.itemHandler.getStackInSlot(SLOT_INPUT);
             if (remainingInput.isEmpty() || (remainingInput.has(ModDataComponents.PURITY.get()) && ModDataComponents.getPurity(remainingInput) >= 5)) {
@@ -444,6 +643,10 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
                 Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
             }
         }
+        ItemStack fwStack = this.firmwareHandler.getStackInSlot(0);
+        if (!fwStack.isEmpty()) {
+            Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), fwStack);
+        }
     }
 
     @Override
@@ -459,20 +662,24 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
     @Nullable
     @Override
     public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
-        return new WasherMenu(containerId, playerInventory, this.worldPosition, this.itemHandler, this.dataAccess);
+        return new WasherMenu(containerId, playerInventory, this.worldPosition, this.itemHandler, this.firmwareHandler, this.dataAccess);
     }
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.putInt("data_version", 2);
+        tag.putInt("data_version", 4);
         tag.put("Inventory", this.itemHandler.serializeNBT(registries));
+        tag.put("Firmware", this.firmwareHandler.serializeNBT(registries));
         tag.put("Tank", this.fluidTank.writeToNBT(registries, new CompoundTag()));
         tag.putInt("Energy", this.energyStorage.getEnergyStored());
         tag.putInt("Progress", this.progress);
+        tag.putDouble("ProgressAccumulator", this.progressAccumulator);
         tag.putInt("MaxProgress", this.maxProgress);
         tag.putInt("Status", this.status.ordinal());
         tag.putString("energy_priority", this.energyPriority.name());
+        tag.putDouble("Heat", this.heatModel.getHeat());
+        tag.putBoolean("Overheated", this.heatModel.isOverheated());
     }
 
     @Override
@@ -481,6 +688,11 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
         if (tag.contains("Inventory")) {
             this.itemHandler.deserializeNBT(registries, tag.getCompound("Inventory"));
         }
+        if (tag.contains("Firmware")) {
+            this.firmwareHandler.deserializeNBT(registries, tag.getCompound("Firmware"));
+        } else {
+            this.firmwareHandler.setStackInSlot(0, ItemStack.EMPTY);
+        }
         if (tag.contains("Tank")) {
             this.fluidTank.readFromNBT(registries, tag.getCompound("Tank"));
         }
@@ -488,6 +700,11 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
             this.energyStorage.setEnergy(tag.getInt("Energy"));
         }
         this.progress = tag.getInt("Progress");
+        if (tag.contains("ProgressAccumulator")) {
+            this.progressAccumulator = tag.getDouble("ProgressAccumulator");
+        } else {
+            this.progressAccumulator = 0.0;
+        }
         this.maxProgress = tag.contains("MaxProgress") ? tag.getInt("MaxProgress") : 80;
         if (tag.contains("Status")) {
             int ord = tag.getInt("Status");
@@ -499,6 +716,12 @@ public class WasherBlockEntity extends BlockEntity implements MenuProvider, Netw
             this.energyPriority = EnergyPriority.fromName(tag.getString("energy_priority"));
         } else {
             this.energyPriority = EnergyPriority.NORMAL;
+        }
+        if (tag.contains("Heat")) {
+            this.heatModel.setHeat(tag.getDouble("Heat"));
+        }
+        if (tag.contains("Overheated")) {
+            this.heatModel.setOverheated(tag.getBoolean("Overheated"));
         }
         ItemStack input = this.itemHandler.getStackInSlot(SLOT_INPUT);
         this.lastInputItem = input.isEmpty() ? Items.AIR : input.getItem();

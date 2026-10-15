@@ -19,8 +19,20 @@ public record TerminalSyncPayload(
         boolean powered,
         int batchIndex,
         int totalBatches,
-        List<TerminalItemEntry> items
+        List<TerminalItemEntry> items,
+        boolean canViewLog
 ) implements CustomPacketPayload {
+
+    public TerminalSyncPayload(
+            int containerId,
+            boolean networkValid,
+            boolean powered,
+            int batchIndex,
+            int totalBatches,
+            List<TerminalItemEntry> items
+    ) {
+        this(containerId, networkValid, powered, batchIndex, totalBatches, items, false);
+    }
 
     public static final Type<TerminalSyncPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(LogTech.MOD_ID, "terminal_sync"));
@@ -32,6 +44,7 @@ public record TerminalSyncPayload(
                 buf.writeBoolean(payload.powered());
                 buf.writeVarInt(payload.batchIndex());
                 buf.writeVarInt(payload.totalBatches());
+                buf.writeBoolean(payload.canViewLog());
                 buf.writeVarInt(payload.items().size());
                 for (TerminalItemEntry entry : payload.items()) {
                     ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, entry.stack());
@@ -39,6 +52,7 @@ public record TerminalSyncPayload(
                     buf.writeVarLong(entry.hotAmount());
                     buf.writeVarLong(entry.coldAmount());
                     buf.writeEnum(entry.pinMode());
+                    buf.writeLong(entry.ratePerMinute());
                 }
             },
             buf -> {
@@ -47,6 +61,7 @@ public record TerminalSyncPayload(
                 boolean powered = buf.readBoolean();
                 int batchIndex = buf.readVarInt();
                 int totalBatches = buf.readVarInt();
+                boolean canViewLog = buf.readBoolean();
                 int size = buf.readVarInt();
                 List<TerminalItemEntry> items = new ArrayList<>(size);
                 for (int i = 0; i < size; i++) {
@@ -56,9 +71,10 @@ public record TerminalSyncPayload(
                     long coldAmount = buf.readVarLong();
                     io.github.chema280101.logtech.storage.ItemPinMode pinMode =
                             buf.readEnum(io.github.chema280101.logtech.storage.ItemPinMode.class);
-                    items.add(new TerminalItemEntry(stack, amount, hotAmount, coldAmount, pinMode));
+                    long ratePerMinute = buf.readLong();
+                    items.add(new TerminalItemEntry(stack, amount, hotAmount, coldAmount, pinMode, ratePerMinute));
                 }
-                return new TerminalSyncPayload(containerId, networkValid, powered, batchIndex, totalBatches, items);
+                return new TerminalSyncPayload(containerId, networkValid, powered, batchIndex, totalBatches, items, canViewLog);
             }
     );
 
@@ -71,7 +87,7 @@ public record TerminalSyncPayload(
         context.enqueueWork(() -> {
             Player player = context.player();
             if (player.containerMenu instanceof TerminalMenu menu && menu.containerId == payload.containerId()) {
-                menu.receiveSync(payload.networkValid(), payload.powered(), payload.batchIndex(), payload.totalBatches(), payload.items());
+                menu.receiveSync(payload.networkValid(), payload.powered(), payload.batchIndex(), payload.totalBatches(), payload.items(), payload.canViewLog());
             }
         });
     }

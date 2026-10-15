@@ -41,25 +41,29 @@ public enum MachineJadeProvider implements IBlockComponentProvider, IServerDataP
             tag.putString("machine_type", "crusher");
             appendBaseData(tag, crusher.getStatus(), crusher.getProgress(), crusher.getMaxProgress(),
                     crusher.getEnergyStorage().getEnergyStored(), crusher.getEnergyStorage().getMaxEnergyStored(),
-                    crusher.getEnergyPriority());
+                    crusher.getEnergyPriority(), crusher.getHeat(), crusher.getFirmwareType());
+            tag.putDouble("cooling", crusher.getCachedCooling());
         } else if (be instanceof WasherBlockEntity washer) {
             tag.putString("machine_type", "washer");
             appendBaseData(tag, washer.getStatus(), washer.getProgress(), washer.getMaxProgress(),
                     washer.getEnergyStorage().getEnergyStored(), washer.getEnergyStorage().getMaxEnergyStored(),
-                    washer.getEnergyPriority());
+                    washer.getEnergyPriority(), washer.getHeat(), washer.getFirmwareType());
+            tag.putDouble("cooling", washer.getCachedCooling());
             tag.putInt("water", washer.getFluidTank().getFluidAmount());
             tag.putInt("max_water", washer.getFluidTank().getCapacity());
         } else if (be instanceof CentrifugeBlockEntity centrifuge) {
             tag.putString("machine_type", "centrifuge");
             appendBaseData(tag, centrifuge.getStatus(), centrifuge.getProgress(), centrifuge.getMaxProgress(),
                     centrifuge.getEnergyStorage().getEnergyStored(), centrifuge.getEnergyStorage().getMaxEnergyStored(),
-                    centrifuge.getEnergyPriority());
+                    centrifuge.getEnergyPriority(), centrifuge.getHeat(), centrifuge.getFirmwareType());
+            tag.putDouble("cooling", centrifuge.getCachedCooling());
         } else if (be instanceof DrillBlockEntity drill) {
             tag.putString("machine_type", "drill");
             int maxProgress = LogTechConfig.DRILL_PROCESS_TIME.get();
             appendBaseData(tag, drill.getStatus(), drill.getProgress(), maxProgress,
                     drill.getEnergyStorage().getEnergyStored(), drill.getEnergyStorage().getMaxEnergyStored(),
-                    drill.getEnergyPriority());
+                    drill.getEnergyPriority(), drill.getHeat(), drill.getFirmwareType());
+            tag.putDouble("cooling", drill.getCachedCooling());
 
             if (accessor.getLevel() instanceof ServerLevel serverLevel) {
                 DepositSavedData savedData = DepositSavedData.get(serverLevel);
@@ -86,13 +90,18 @@ public enum MachineJadeProvider implements IBlockComponentProvider, IServerDataP
     }
 
     private void appendBaseData(CompoundTag tag, MachineStatus status, int progress, int maxProgress,
-                                int energy, int maxEnergy, EnergyPriority priority) {
+                                int energy, int maxEnergy, EnergyPriority priority, double heat,
+                                io.github.chema280101.logtech.machine.firmware.FirmwareType firmware) {
         tag.putString("status_cause", status.getCauseKey());
         tag.putInt("progress", progress);
         tag.putInt("max_progress", maxProgress);
         tag.putInt("energy", energy);
         tag.putInt("max_energy", maxEnergy);
         tag.putString("priority_key", priority.getTranslationKey());
+        tag.putInt("heat", (int) Math.round(heat));
+        if (firmware != null && firmware != io.github.chema280101.logtech.machine.firmware.FirmwareType.NONE) {
+            tag.putString("firmware", firmware.getId());
+        }
     }
 
     @Override
@@ -124,14 +133,34 @@ public enum MachineJadeProvider implements IBlockComponentProvider, IServerDataP
                 String.format("%,d", energy),
                 String.format("%,d", maxEnergy)).withStyle(ChatFormatting.AQUA));
 
-        // 4. Prioridad
+        // 4. Calor
+        if (tag.contains("heat")) {
+            int heat = tag.getInt("heat");
+            ChatFormatting heatColor = (heat >= 100) ? ChatFormatting.RED : (heat > 70 ? ChatFormatting.GOLD : ChatFormatting.GREEN);
+            tooltip.add(Component.translatable("gui.logtech.jade.heat", heat).withStyle(heatColor));
+        }
+
+        // 4b. Enfriamiento / Disipación
+        if (tag.contains("cooling")) {
+            double cooling = tag.getDouble("cooling");
+            tooltip.add(Component.translatable("gui.logtech.jade.cooling", String.format(java.util.Locale.ROOT, "%.1f", cooling)).withStyle(ChatFormatting.AQUA));
+        }
+
+        // 5. Prioridad
         if (tag.contains("priority_key")) {
             String priorityKey = tag.getString("priority_key");
             tooltip.add(Component.translatable("gui.logtech.jade.priority",
                     Component.translatable(priorityKey).withStyle(ChatFormatting.YELLOW)).withStyle(ChatFormatting.GRAY));
         }
 
-        // 5. Lavadora: Agua
+        // 5b. Firmware
+        if (tag.contains("firmware")) {
+            String fwId = tag.getString("firmware");
+            tooltip.add(Component.translatable("gui.logtech.jade.firmware",
+                    Component.translatable("item.logtech.firmware_" + fwId)).withStyle(ChatFormatting.LIGHT_PURPLE));
+        }
+
+        // 6. Lavadora: Agua
         if (tag.contains("water")) {
             int water = tag.getInt("water");
             int maxWater = tag.getInt("max_water");

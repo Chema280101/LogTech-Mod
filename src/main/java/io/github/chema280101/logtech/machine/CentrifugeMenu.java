@@ -23,16 +23,16 @@ public class CentrifugeMenu extends AbstractContainerMenu implements PriorityCon
 
     // Constructor cliente
     public CentrifugeMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buf) {
-        this(containerId, playerInventory, buf.readBlockPos(), new ItemStackHandler(CentrifugeBlockEntity.TOTAL_SLOTS), new SimpleContainerData(8));
+        this(containerId, playerInventory, buf.readBlockPos(), new ItemStackHandler(CentrifugeBlockEntity.TOTAL_SLOTS), new ItemStackHandler(1), new SimpleContainerData(10));
     }
 
     // Constructor servidor
-    public CentrifugeMenu(int containerId, Inventory playerInventory, BlockPos pos, IItemHandler itemHandler, ContainerData data) {
+    public CentrifugeMenu(int containerId, Inventory playerInventory, BlockPos pos, IItemHandler itemHandler, IItemHandler firmwareHandler, ContainerData data) {
         super(ModMenuTypes.CENTRIFUGE.get(), containerId);
         this.pos = pos;
         this.data = data;
 
-        checkContainerDataCount(data, 8);
+        checkContainerDataCount(data, 10);
         addDataSlots(data);
 
         // Ranura 0: Entrada
@@ -58,14 +58,22 @@ public class CentrifugeMenu extends AbstractContainerMenu implements PriorityCon
             }
         });
 
-        // Inventario del jugador
+        // Ranura 4: Firmware
+        this.addSlot(new SlotItemHandler(firmwareHandler, 0, 48, 15) {
+            @Override
+            public boolean mayPlace(ItemStack stack) {
+                return stack.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem;
+            }
+        });
+
+        // Inventario del jugador (5..31)
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 this.addSlot(new Slot(playerInventory, col + row * 9 + 9, 8 + col * 18, 84 + row * 18));
             }
         }
 
-        // Hotbar del jugador
+        // Hotbar del jugador (32..40)
         for (int col = 0; col < 9; col++) {
             this.addSlot(new Slot(playerInventory, col, 8 + col * 18, 142));
         }
@@ -109,6 +117,14 @@ public class CentrifugeMenu extends AbstractContainerMenu implements PriorityCon
         this.data.set(7, priority != null ? priority.ordinal() : EnergyPriority.NORMAL.ordinal());
     }
 
+    public int getHeat() {
+        return this.data.get(8);
+    }
+
+    public double getCooling() {
+        return this.data.get(9) / 10.0;
+    }
+
     @Override
     public boolean stillValid(Player player) {
         return stillValid(ContainerLevelAccess.create(player.level(), this.pos), player, ModBlocks.CENTRIFUGE.get());
@@ -122,29 +138,33 @@ public class CentrifugeMenu extends AbstractContainerMenu implements PriorityCon
             ItemStack stackInSlot = slot.getItem();
             itemstack = stackInSlot.copy();
 
-            // Índices: 0=Entrada, 1..3=Salidas, 4..30=Inventario jugador, 31..39=Hotbar
+            // Índices: 0=Entrada, 1..3=Salidas, 4=Firmware, 5..31=Inventario jugador, 32..40=Hotbar
             if (index >= 1 && index <= 3) {
                 // Desde salidas hacia el inventario del jugador
-                if (!this.moveItemStackTo(stackInSlot, 4, 40, true)) {
+                if (!this.moveItemStackTo(stackInSlot, 5, 41, true)) {
                     return ItemStack.EMPTY;
                 }
                 slot.onQuickCraft(stackInSlot, itemstack);
-            } else if (index == 0) {
-                // Desde entrada hacia el inventario del jugador
-                if (!this.moveItemStackTo(stackInSlot, 4, 40, false)) {
+            } else if (index == 0 || index == 4) {
+                // Desde entrada o firmware hacia el inventario del jugador
+                if (!this.moveItemStackTo(stackInSlot, 5, 41, false)) {
                     return ItemStack.EMPTY;
                 }
             } else {
-                // Desde inventario del jugador hacia la máquina (ranura de entrada 0)
-                if (!this.moveItemStackTo(stackInSlot, 0, 1, false)) {
-                    if (index >= 4 && index < 31) {
+                // Desde inventario del jugador hacia la máquina
+                if (stackInSlot.getItem() instanceof io.github.chema280101.logtech.item.FirmwareItem) {
+                    if (!this.moveItemStackTo(stackInSlot, 4, 5, false)) {
+                        return ItemStack.EMPTY;
+                    }
+                } else if (!this.moveItemStackTo(stackInSlot, 0, 1, false)) {
+                    if (index >= 5 && index < 32) {
                         // De inventario principal a hotbar
-                        if (!this.moveItemStackTo(stackInSlot, 31, 40, false)) {
+                        if (!this.moveItemStackTo(stackInSlot, 32, 41, false)) {
                             return ItemStack.EMPTY;
                         }
-                    } else if (index >= 31 && index < 40) {
+                    } else if (index >= 32 && index < 41) {
                         // De hotbar a inventario principal
-                        if (!this.moveItemStackTo(stackInSlot, 4, 31, false)) {
+                        if (!this.moveItemStackTo(stackInSlot, 5, 32, false)) {
                             return ItemStack.EMPTY;
                         }
                     }

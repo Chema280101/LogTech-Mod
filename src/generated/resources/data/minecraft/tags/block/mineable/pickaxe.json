@@ -11,6 +11,7 @@
     "logtech:coal_generator",
     "logtech:centrifuge",
     "logtech:washer",
-    "logtech:slag_block"
+    "logtech:slag_block",
+    "logtech:heatsink"
   ]
 }

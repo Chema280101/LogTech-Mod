@@ -26,5 +26,10 @@ public class ModItemModelProvider extends ItemModelProvider {
         basicItem(ModItems.SLAG.get());
         basicItem(ModItems.CRYSTAL_SHARD.get());
         basicItem(ModItems.SLUDGE.get());
+        basicItem(ModItems.FIRMWARE_ECO.get());
+        basicItem(ModItems.FIRMWARE_TURBO.get());
+        basicItem(ModItems.FIRMWARE_SAFE.get());
+        basicItem(ModItems.FIRMWARE_SELECTIVE.get());
+        basicItem(ModItems.CONFIG_KEY.get());
     }
 }

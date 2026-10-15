@@ -28,8 +28,51 @@ public record TerminalStatsPayload(
         int energyCapacity,
         int energyConsumption,
         int[] hourlyHistory,
-        List<MachineStatEntry> machines
+        List<MachineStatEntry> machines,
+        long quarantineCount,
+        long hotUsedCapacity,
+        long hotTotalCapacity,
+        long coldUsedCapacity,
+        long coldTotalCapacity,
+        long hotNetRate,
+        long coldNetRate,
+        long totalNetRate
 ) implements CustomPacketPayload {
+
+    public TerminalStatsPayload(
+            int containerId,
+            long usedCapacity,
+            long totalCapacity,
+            int itemsPerMinuteLast,
+            float itemsPerMinute5MinAvg,
+            int energyStored,
+            int energyCapacity,
+            int energyConsumption,
+            int[] hourlyHistory,
+            List<MachineStatEntry> machines,
+            long quarantineCount
+    ) {
+        this(
+                containerId,
+                usedCapacity,
+                totalCapacity,
+                itemsPerMinuteLast,
+                itemsPerMinute5MinAvg,
+                energyStored,
+                energyCapacity,
+                energyConsumption,
+                hourlyHistory,
+                machines,
+                quarantineCount,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L
+        );
+    }
 
     public static final Type<TerminalStatsPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(LogTech.MOD_ID, "terminal_stats"));
@@ -55,7 +98,18 @@ public record TerminalStatsPayload(
                     ComponentSerialization.STREAM_CODEC.encode(buf, machine.name());
                     buf.writeEnum(machine.status());
                     buf.writeVarInt(machine.itemsPerMinute());
+                    buf.writeVarInt(machine.heat());
+                    buf.writeEnum(machine.firmware());
                 }
+
+                buf.writeVarLong(payload.quarantineCount());
+                buf.writeVarLong(payload.hotUsedCapacity());
+                buf.writeVarLong(payload.hotTotalCapacity());
+                buf.writeVarLong(payload.coldUsedCapacity());
+                buf.writeVarLong(payload.coldTotalCapacity());
+                buf.writeLong(payload.hotNetRate());
+                buf.writeLong(payload.coldNetRate());
+                buf.writeLong(payload.totalNetRate());
             },
             buf -> {
                 int containerId = buf.readVarInt();
@@ -79,8 +133,20 @@ public record TerminalStatsPayload(
                     Component name = ComponentSerialization.STREAM_CODEC.decode(buf);
                     MachineStatus status = buf.readEnum(MachineStatus.class);
                     int itemsPerMinute = buf.readVarInt();
-                    machines.add(new MachineStatEntry(name, status, itemsPerMinute));
+                    int heat = buf.readVarInt();
+                    io.github.chema280101.logtech.machine.firmware.FirmwareType firmware =
+                            buf.readEnum(io.github.chema280101.logtech.machine.firmware.FirmwareType.class);
+                    machines.add(new MachineStatEntry(name, status, itemsPerMinute, heat, firmware));
                 }
+
+                long quarantineCount = buf.readVarLong();
+                long hotUsedCapacity = buf.readVarLong();
+                long hotTotalCapacity = buf.readVarLong();
+                long coldUsedCapacity = buf.readVarLong();
+                long coldTotalCapacity = buf.readVarLong();
+                long hotNetRate = buf.readLong();
+                long coldNetRate = buf.readLong();
+                long totalNetRate = buf.readLong();
 
                 return new TerminalStatsPayload(
                         containerId,
@@ -92,7 +158,15 @@ public record TerminalStatsPayload(
                         energyCapacity,
                         energyConsumption,
                         history,
-                        machines
+                        machines,
+                        quarantineCount,
+                        hotUsedCapacity,
+                        hotTotalCapacity,
+                        coldUsedCapacity,
+                        coldTotalCapacity,
+                        hotNetRate,
+                        coldNetRate,
+                        totalNetRate
                 );
             }
     );
@@ -112,5 +186,13 @@ public record TerminalStatsPayload(
         });
     }
 
-    public record MachineStatEntry(Component name, MachineStatus status, int itemsPerMinute) {}
+    public record MachineStatEntry(Component name, MachineStatus status, int itemsPerMinute, int heat, io.github.chema280101.logtech.machine.firmware.FirmwareType firmware) {
+        public MachineStatEntry(Component name, MachineStatus status, int itemsPerMinute, int heat) {
+            this(name, status, itemsPerMinute, heat, io.github.chema280101.logtech.machine.firmware.FirmwareType.NONE);
+        }
+
+        public MachineStatEntry(Component name, MachineStatus status, int itemsPerMinute) {
+            this(name, status, itemsPerMinute, 0, io.github.chema280101.logtech.machine.firmware.FirmwareType.NONE);
+        }
+    }
 }

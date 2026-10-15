@@ -78,7 +78,7 @@ public class CoalGeneratorScreen extends AbstractContainerScreen<CoalGeneratorMe
         Component statusText = status.getDisplayName();
         int textColor = switch (status) {
             case WORKING -> 0x2E7D32;
-            case NO_ENERGY, SHED -> 0xD32F2F;
+            case NO_ENERGY, SHED, OVERHEATED -> 0xD32F2F;
             case NO_INPUT, NO_RESOURCE, NO_FLUID, IDLE -> 0x757575;
             case OUTPUT_FULL -> 0xF57C00;
         };

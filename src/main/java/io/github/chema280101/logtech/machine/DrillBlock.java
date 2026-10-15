@@ -18,17 +18,41 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DirectionProperty;
+
 public class DrillBlock extends Block implements EntityBlock {
+    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
     public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
 
     public DrillBlock(Properties properties) {
         super(properties);
-        this.registerDefaultState(this.stateDefinition.any().setValue(ACTIVE, false));
+        this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(ACTIVE, false));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(ACTIVE);
+        builder.add(FACING, ACTIVE);
+    }
+
+    @Nullable
+    @Override
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
+        return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+    }
+
+    @Override
+    protected BlockState rotate(BlockState state, Rotation rotation) {
+        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
+    }
+
+    @Override
+    protected BlockState mirror(BlockState state, Mirror mirror) {
+        return state.rotate(mirror.getRotation(state.getValue(FACING)));
     }
 
     @Nullable
@@ -57,6 +81,9 @@ public class DrillBlock extends Block implements EntityBlock {
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof DrillBlockEntity drillBe) {
             if (player.isShiftKeyDown()) {
+                if (!io.github.chema280101.logtech.security.NetworkSecurity.canPlayerDo(player, io.github.chema280101.logtech.security.PlayerAction.CHANGE_PRIORITY)) {
+                    return InteractionResult.CONSUME;
+                }
                 io.github.chema280101.logtech.network.EnergyPriority next = drillBe.getEnergyPriority().next();
                 drillBe.setEnergyPriority(next);
                 player.displayClientMessage(
@@ -66,20 +93,37 @@ public class DrillBlock extends Block implements EntityBlock {
                 return InteractionResult.CONSUME;
             }
 
-            player.displayClientMessage(
-                    Component.translatable(
-                            "chat.logtech.drill.status",
-                            drillBe.getStatus().getDisplayName(),
-                            drillBe.getEnergyStorage().getEnergyStored(),
-                            drillBe.getEnergyStorage().getMaxEnergyStored(),
-                            drillBe.getBufferCount()
-                    ),
-                    true
-            );
-            return InteractionResult.CONSUME;
+            if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+                if (io.github.chema280101.logtech.security.NetworkSecurity.canPlayerDo(player, io.github.chema280101.logtech.security.PlayerAction.INTERACT_MACHINE)) {
+                    serverPlayer.openMenu(drillBe, pos);
+                    return InteractionResult.CONSUME;
+                }
+            }
         }
 
         return InteractionResult.PASS;
+    }
+
+    @Override
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, BlockPos neighborPos, boolean isMovedByPiston) {
+        super.neighborChanged(state, level, pos, neighborBlock, neighborPos, isMovedByPiston);
+        if (!level.isClientSide()) {
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be instanceof HeatDissipatingMachine machine) {
+                machine.recalculateCooling();
+            }
+        }
+    }
+
+    @Override
+    protected BlockState updateShape(BlockState state, Direction direction, BlockState neighborState, net.minecraft.world.level.LevelAccessor level, BlockPos currentPos, BlockPos neighborPos) {
+        if (level instanceof Level lvl && !lvl.isClientSide()) {
+            BlockEntity be = lvl.getBlockEntity(currentPos);
+            if (be instanceof HeatDissipatingMachine machine) {
+                machine.recalculateCooling();
+            }
+        }
+        return super.updateShape(state, direction, neighborState, level, currentPos, neighborPos);
     }
 
     @Override
@@ -89,6 +133,10 @@ public class DrillBlock extends Block implements EntityBlock {
             NetworkManager manager = NetworkManager.get(level);
             if (manager != null) {
                 manager.onComponentAdded(pos);
+            }
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be instanceof HeatDissipatingMachine machine) {
+                machine.recalculateCooling();
             }
         }
     }

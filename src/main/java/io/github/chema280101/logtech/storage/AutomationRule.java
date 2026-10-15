@@ -93,6 +93,9 @@ public class AutomationRule<K> {
         if (action.requiresItem() && item == null) {
             return false;
         }
+        if ((action == RuleAction.DISCARD_EXCESS || action == RuleAction.COMPACT) && conditionType != RuleConditionType.ITEM_COUNT_GREATER) {
+            return false;
+        }
         return threshold >= 0L;
     }
 

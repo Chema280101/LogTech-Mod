@@ -18,6 +18,8 @@ public record TerminalTabPayload(int containerId, int activeTab) implements Cust
     public static final int TAB_ITEMS = 0;
     public static final int TAB_STATS = 1;
     public static final int TAB_ENERGY = 2;
+    public static final int TAB_TRASH = 3;
+    public static final int TAB_LOG = 4;
 
     public TerminalTabPayload(int containerId, boolean statsTabOpen) {
         this(containerId, statsTabOpen ? TAB_STATS : TAB_ITEMS);

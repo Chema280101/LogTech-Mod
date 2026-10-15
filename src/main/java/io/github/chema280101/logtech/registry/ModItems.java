@@ -45,6 +45,9 @@ public class ModItems {
     // Item del bloque de Escoria
     public static final DeferredItem<BlockItem> SLAG_BLOCK_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.SLAG_BLOCK);
 
+    // Item del bloque Disipador
+    public static final DeferredItem<BlockItem> HEATSINK_ITEM = ITEMS.registerSimpleBlockItem(ModBlocks.HEATSINK);
+
     // Modulo de datos: aporta capacidad a los racks
     public static final DeferredItem<Item> DATA_MODULE = ITEMS.registerSimpleItem("data_module");
     public static final DeferredItem<Item> DATA_MODULE_ADVANCED = ITEMS.registerSimpleItem("data_module_advanced");
@@ -82,4 +85,30 @@ public class ModItems {
     // Escáner de vetas
     public static final DeferredItem<io.github.chema280101.logtech.item.ScannerItem> SCANNER =
             ITEMS.register("scanner", () -> new io.github.chema280101.logtech.item.ScannerItem(new Item.Properties().stacksTo(1)));
+
+    // Chips de firmware
+    public static final DeferredItem<io.github.chema280101.logtech.item.FirmwareItem> FIRMWARE_ECO =
+            ITEMS.register("firmware_eco", () -> new io.github.chema280101.logtech.item.FirmwareItem(
+                    io.github.chema280101.logtech.machine.firmware.FirmwareType.ECO,
+                    new Item.Properties()
+            ));
+    public static final DeferredItem<io.github.chema280101.logtech.item.FirmwareItem> FIRMWARE_TURBO =
+            ITEMS.register("firmware_turbo", () -> new io.github.chema280101.logtech.item.FirmwareItem(
+                    io.github.chema280101.logtech.machine.firmware.FirmwareType.TURBO,
+                    new Item.Properties()
+            ));
+    public static final DeferredItem<io.github.chema280101.logtech.item.FirmwareItem> FIRMWARE_SAFE =
+            ITEMS.register("firmware_safe", () -> new io.github.chema280101.logtech.item.FirmwareItem(
+                    io.github.chema280101.logtech.machine.firmware.FirmwareType.SAFE,
+                    new Item.Properties()
+            ));
+    public static final DeferredItem<io.github.chema280101.logtech.item.FirmwareItem> FIRMWARE_SELECTIVE =
+            ITEMS.register("firmware_selective", () -> new io.github.chema280101.logtech.item.FirmwareItem(
+                    io.github.chema280101.logtech.machine.firmware.FirmwareType.SELECTIVE,
+                    new Item.Properties()
+            ));
+
+    // Llave de configuración
+    public static final DeferredItem<io.github.chema280101.logtech.item.ConfigKeyItem> CONFIG_KEY =
+            ITEMS.register("config_key", () -> new io.github.chema280101.logtech.item.ConfigKeyItem(new Item.Properties()));
 }

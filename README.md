@@ -7,7 +7,7 @@
   [![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-brightgreen.svg)](https://www.minecraft.net/)
   [![NeoForge](https://img.shields.io/badge/NeoForge-21.0.167+-orange.svg)](https://neoforged.net/)
   [![Java](https://img.shields.io/badge/Java-21-blue.svg)](https://www.oracle.com/java/)
-  [![Version](https://img.shields.io/badge/Release-v0.2.0--alpha-blueviolet.svg)](https://github.com/Chema280101/LogTech-Mod/releases/tag/v0.2.0)
+  [![Version](https://img.shields.io/badge/Release-v0.3.0--alpha-blueviolet.svg)](https://github.com/Chema280101/LogTech-Mod/releases/tag/v0.3.0)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
   [![Issues](https://img.shields.io/badge/Issues-GitHub-informational.svg)](https://github.com/Chema280101/LogTech-Mod/issues)
 </div>
@@ -16,15 +16,17 @@
 
 > [!WARNING]
 > ### ⚠️ NOTA DE MIGRACIÓN CRÍTICA / CRITICAL MIGRATION NOTICE
-> **🇪🇸 Antes de actualizar desde la v0.1:**
-> 1. **Haz una copia de seguridad obligatoria de tu mundo** antes de instalar la versión v0.2.0.
-> 2. **Compatibilidad unidireccional:** Un mundo cargado o guardado con la versión v0.2 **NO se puede volver a abrir con la v0.1** (provocaría corrupción o pérdida de datos debido a las nuevas estructuras de NBT y `data_version`).
-> 3. **Conservación de inventario:** Todos los datos existentes en redes y núcleos de la v0.1 se migran automáticamente al 100% hacia el nivel caliente (`rack`) sin pérdida de ítems ni configuraciones.
+> **🇪🇸 Antes de actualizar desde la v0.1 o la v0.2:**
+> 1. **Haz una copia de seguridad obligatoria de tu mundo** antes de instalar la versión v0.3.0.
+> 2. **Compatibilidad unidireccional:** Un mundo cargado o guardado con la versión v0.3 **NO se puede volver a abrir con la v0.1 ni con la v0.2** (provocaría corrupción o pérdida de datos debido a las nuevas estructuras de NBT y `data_version: 8`).
+> 3. **Conservación íntegra de datos:** Todos los datos existentes de mundos v0.1 y v0.2 (redes, inventarios, niveles caliente/frío, energía y reglas) se migran automáticamente al 100% sin pérdida de ítems ni configuraciones.
+> 4. **Seguridad de redes y protección perimetral:** En modo Privado, las redes controlan estrictamente quién puede abrir el Terminal, insertar o extraer ítems, modificar reglas y romper el bloque del Núcleo (restringido a Administradores). **Ten en cuenta que los bloques periféricos (cables Backbone, Racks, Terminales) no están protegidos individualmente contra rotura física en el mundo;** para una protección perimetral completa en servidores multijugador se recomienda combinarlo con mods de reclamo de chunks (como FTB Chunks, FLAN o Open Parties and Claims).
 >
-> **🇬🇧 Before upgrading from v0.1:**
-> 1. **Make a mandatory backup of your world** before installing v0.2.0.
-> 2. **One-way compatibility:** A world opened or saved in v0.2 **CANNOT be reopened in v0.1** (opening with older versions will cause data loss or corruption due to upgraded NBT schemas and `data_version`).
-> 3. **Data preservation:** All existing inventories and network blocks from v0.1 are automatically migrated 100% into the Hot storage tier (`rack`) with zero item loss.
+> **🇬🇧 Before upgrading from v0.1 or v0.2:**
+> 1. **Make a mandatory backup of your world** before installing v0.3.0.
+> 2. **One-way compatibility:** A world opened or saved in v0.3 **CANNOT be reopened in v0.1 or v0.2** (opening with older versions will cause data loss or corruption due to upgraded NBT schemas and `data_version: 8`).
+> 3. **Full data preservation:** All existing inventories, hot/cold tiers, energy buffers, and automation rules from v0.1 and v0.2 are automatically migrated 100% with zero item loss.
+> 4. **Network security & perimeter boundaries:** In Private mode, networks strictly regulate who can access the Terminal, insert/extract items, edit rules, and break the Core block (restricted to Admins). **Please note that peripheral blocks (Backbone cables, Racks, Terminals) are not individually protected against physical breaking in the world;** pairing with chunk claim mods (such as FTB Chunks, FLAN, or Open Parties and Claims) is recommended for full perimeter security on multiplayer servers.
 
 ---
 
@@ -36,36 +38,62 @@
 <a name="español"></a>
 # 🇪🇸 LogTech (Español)
 
-**LogTech** es un mod de tecnología y automatización para Minecraft 1.21.1 basado en NeoForge. Su filosofía central es permitir al jugador **ver, medir y optimizar su fábrica**. Combina prospección determinista de vetas minerales, procesamiento con cadena de pureza, almacenamiento jerárquico caliente/frío, automatización por reglas en el Núcleo, red eléctrica unificada con prioridades y telemetría por máquina en tiempo real.
+**LogTech** es un mod de tecnología y automatización para Minecraft 1.21.1 basado en NeoForge. Su filosofía central es permitir al jugador **ver, medir y optimizar su fábrica**. Combina prospección determinista de vetas minerales, procesamiento con cadena de pureza, almacenamiento jerárquico caliente/frío, dinámica térmica con disipadores, chips de firmware, automatización por reglas avanzadas, control de acceso multijugador y telemetría por máquina en tiempo real.
 
 ![Red de almacenamiento y Núcleo](docs/assets/core_network.png)
 
-## ✨ Novedades de la Versión v0.2.0 (Alpha)
+## ✨ Novedades de la Versión v0.3.0 (Alpha)
 
-- **💎 Sistema de Pureza Mineral (1 a 5):** Los minerales brutos generados por la Perforadora ahora heredan la pureza determinista de la veta subterránea (1 a 5). Esta pureza se preserva a través del Triturador y de la red de almacenamiento en pilas independientes.
-- **🌊 Lavadora Industrial:** Máquina con tanque interno de 4 000 mB de agua. Consume 250 mB de agua y 60 FE/t para purificar el polvo ($p \to p+1$, hasta nivel 5), generando lodo (`sludge`) como subproducto. Compatible con cubos y tuberías de fluidos externas.
-- **🔄 Centrífuga de Subproductos:** Procesa polvos a 80 FE/t, separando escoria (`slag`) con una probabilidad que escala inversamente a la pureza del mineral ($80\% \times (6-p)/5$). Además, centrifuga el lodo para extraer valiosos fragmentos de cristal (`crystal_shard`). Cuenta con prevención de pérdida por ranuras llenas (`OUTPUT_FULL`).
-- **🔥 Generador de Carbón:** Quema combustibles sólidos convencionales (carbón o carbón vegetal) generando 40 FE/t constantes, permitiendo alimentar redes y maquinaria de LogTech sin requerir mods de energía externos.
-- **🧊 Almacenamiento Jerárquico Caliente y Frío:**
-  - **Rack Frío (`cold_rack`):** Proporciona **4x capacidad** de almacenamiento respecto al rack estándar (16 384 ítems base por módulo).
-  - **Recuperación con Progreso:** La extracción desde el nivel frío en el Terminal incluye una cola visual con cuenta atrás y entrega atómica sin riesgo de duplicación.
-  - **Rebalanceo Automático y Fijación:** El Núcleo monitoriza la frecuencia de extracción (+1 uso) con decaimiento temporal y desciende ítems poco usados al frío si el caliente supera el 90%. Puedes fijar cualquier ítem en el Terminal con `Ctrl + Clic derecho` (`AUTO`, `FIJAR_CALIENTE`, `SOLO_FRIO`).
-  - **Módulos de Datos Avanzados:** Módulo Avanzado (Nivel 2, 4x capacidad) y Módulo Maestro (Nivel 3, 16x capacidad).
-- **⚙️ Reglas de Automatización y Alarma de Redstone:**
-  - El Núcleo incorpora una pantalla con pestaña de **Reglas** (hasta 8 reglas configurables) con ranuras fantasma, condiciones por cantidad o espacio usado, histéresis anti-parpadeo y acciones automáticas (`Mover al frío`, `Avisar`, `Señal de redstone`).
-  - **Alarma (`alarm`):** Bloque de red con 4 canales independientes seleccionables mediante clic derecho. Emite señal de redstone 15 e ilumina su modelo cuando su canal se activa.
-  - Notificaciones acústicas y por chat en un radio de 64 bloques con rearme automático.
-- **⚡ Red Eléctrica Unificada y Prioridades:**
-  - Cualquier Backbone acepta energía FE externa canalizándola al búfer central del Núcleo (200 000 FE base).
-  - Reparto proporcional del Núcleo entre todas las máquinas conectadas sin fugas de energía.
-  - Configuración de prioridades (`Alta`, `Normal`, `Baja`) por máquina mediante botones en sus interfaces o Shift + Clic derecho en la Perforadora, con desconexión segura (`SHED`) y estabilidad temporal anti-parpadeo.
-- **📊 Panel de Energía en el Terminal:**
-  - Tercera pestaña interactiva en el Terminal con medidor visual de FE, tasas en tiempo real de entrada y consumo, gráfica de barras histórica de 60 minutos (verde para entrada, naranja para salida) con tooltips de balance neto, desglose por ramas (Almacenamiento vs Maquinaria) y conmutación de prioridades con un clic.
-- **🧩 Integración con Visores (Soft Dependencies):**
-  - **Jade:** HUD detallado al mirar cualquier bloque (estado, causa, progreso, energía, agua, pureza de veta y capacidad de rack).
-  - **JEI y EMI:** Categorías completas para Triturador, Lavadora y Centrífuga con tooltip dinámico de probabilidad inversa, fluidos y efecto de pureza.
+- **🔥 Sistema Térmico y Disipación Activa:**
+  - **Dinámica de Calor (0 a 100 °C):** El Triturador, la Lavadora, la Centrífuga y la Perforadora acumulan temperatura al operar. En condiciones estándar se equilibran a ~50 °C sin problemas.
+  - **Ralentización y Apagado:** Por encima de 70 °C la máquina entra en estrangulamiento térmico (opera al 50% de velocidad consumiendo la mitad de FE). A 100 °C se apaga por seguridad (`OVERHEATED`) y no se reactiva hasta enfriar a $\le 40$ °C.
+  - **Bloque Disipador (`heatsink`):** Añade refrigeración pasiva continua (+1.0 °C/s por disipador en contacto) y refrigeración líquida (+0.5 °C/s por cara sumergida en agua).
+  - Medidor de calor con barra animada, tooltips informativos en pantalla y soporte en HUD de Jade.
 
-![Panel de energía en el Terminal](docs/assets/energy_panel.png)
+![Sistema térmico y disipación](docs/assets/machine_heat.png)
+
+- **💾 Chips de Firmware para Máquinas:**
+  - Ranura dedicada de firmware en Triturador, Lavadora, Centrífuga y Perforadora (con nueva interfaz gráfica propia).
+  - **Firmware Eco:** Velocidad ×0.7, energía ×0.5, calor ×0.5.
+  - **Firmware Turbo:** Velocidad ×1.5, energía ×2.0, calor ×3.0 (¡requiere disipadores!).
+  - **Firmware Seguro:** Velocidad fija 1.0x sin ralentización intermedia; se apaga preventivamente a 85 °C y reanuda a $\le 30$ °C.
+  - **Firmware Selectivo:** Filtro inteligente para tolvas y tuberías automáticas en Lavadora y Centrífuga (configurado con Shift + Clic derecho).
+
+- **🗑️ Red de Seguridad: Papelera y Cuarentena:**
+  - **Papelera (`TrashBin`):** Pestaña «Papelera» en el Terminal para recuperar ítems descartados con el botón «Destruir» o reglas de excedente. Capacidad de hasta 4 096 ítems y 30 minutos de vida (`gameTime`) con expiración FIFO y restauración con un clic.
+  - **Cuarentena (`QuarantineBuffer`):** Búfer de emergencia de 1 024 ítems en el Núcleo que absorbe entradas automáticas cuando la red se queda sin energía o espacio, vaciándose automáticamente a la red al restablecerse.
+  - **Acción «Descartar excedente» (`DISCARD_EXCESS`):** Regla que mantiene el inventario exactamente en $N$, enviando los sobrantes a la papelera sin oscilaciones.
+  - **Condición «Cuarentena mayor que» (`QUARANTINE_GREATER`):** Detecta acumulaciones en cuarentena para alertar al jugador o encender alarmas.
+
+![Pestaña de papelera en el Terminal](docs/assets/trash_tab.png)
+
+- **📦 Compactación Automática de Recursos (`COMPACT`):**
+  - Acción en reglas del Núcleo que analiza automáticamente el libro de recetas en busca de relaciones 3×3 o 2×2 simétricas reversibles (lingotes $\leftrightarrow$ bloques).
+  - Convierte atómicamente excedentes respetando componentes especiales y pureza mineral, con lista negra configurable.
+
+- **🔍 Vistas Guardadas y Filtros Avanzados:**
+  - 8 botones de acceso directo [1..8] en el Terminal. Guarda con Shift + Clic y recupera con un Clic tus filtros de texto, criterio de ordenación, nivel (`Todos`, `Caliente`, `Frío`) y pureza mínima (0 a 5).
+  - Sincronización en tiempo real entre todos los jugadores que tengan el Terminal abierto.
+
+- **📈 Estimaciones de Flujo y Tendencias:**
+  - Rastreador en memoria (`RateTracker`) de 5 minutos: los tooltips de ítems muestran su ritmo neto (`+120/min`, `−45/min`) y el tiempo estimado hasta agotarse.
+  - La pestaña Estadísticas pronostica el tiempo de llenado total y segregado por nivel caliente y frío.
+
+- **🔑 Llave de Configuración (`config_key`):**
+  - Herramienta para clonar configuraciones en masa: Shift + Clic derecho copia los ajustes (prioridad eléctrica en máquinas, canales en alarmas, reglas y fijación en el Núcleo) y Clic derecho los aplica en bloques idénticos.
+
+- **🛡️ Permisos de Acceso y Redes Privadas:**
+  - El jugador que coloca el Núcleo se registra como Propietario.
+  - Conmutador entre red **Abierta** (acceso público) y **Privada** (controlada).
+  - Pestaña **Acceso** en el Núcleo para gestionar usuarios con permisos granulares: Ver (`VIEW`), Extraer (`EXTRACT`), Insertar (`INSERT`) y Administrar (`ADMIN`).
+  - Revocación instantánea en tiempo real (cierra interfaces al retirar permisos) y protección contra rotura del Núcleo para jugadores no administradores.
+
+![Pestaña de acceso y permisos](docs/assets/access_tab.png)
+
+- **📜 Registro de Auditoría de Actividad:**
+  - Búfer de 500 eventos en el Núcleo que registra inserciones, extracciones, destrucciones, restauraciones y cambios de reglas o permisos ejecutados por jugadores.
+  - Agrupación temporal inteligente (10 s) para evitar saturación ante clics repetidos.
+  - Pestaña **Registro** en el Terminal para administradores con navegación paginada y buscador por nombre de jugador.
 
 ---
 
@@ -77,53 +105,48 @@
 
 ## 💾 Instalación
 1. Instala **Minecraft 1.21.1** con el instalador oficial de **NeoForge**.
-2. Descarga `logtech-0.2.0.jar` desde [Releases en GitHub](https://github.com/Chema280101/LogTech-Mod/releases), [Modrinth](https://modrinth.com) o [CurseForge](https://curseforge.com).
+2. Descarga `logtech-0.3.0.jar` desde [Releases en GitHub](https://github.com/Chema280101/LogTech-Mod/releases), [Modrinth](https://modrinth.com) o [CurseForge](https://curseforge.com).
 3. Coloca el archivo `.jar` en tu carpeta `.minecraft/mods/`.
 4. *(Opcional)* Añade Jade o JEI a la carpeta `mods/` para disfrutar de integración HUD y recetario en juego.
 5. Inicia el juego.
 
 ---
 
-## 🚀 Ruta de Juego Actualizada (Cadena de Pureza)
+## 🚀 Ruta de Juego y Guía de Fábrica
 
 ### 1. Prospección Subterránea (El Escáner)
 - Craftea el **Escáner** (hierro, redstone y brújula).
 - **Clic derecho:** Explora un radio de 96 bloques. Descubre vetas subterráneas de **Neoferrita** o **Cristalita** e identifica su **pureza determinista (1 a 5)** y reservas estimadas.
-- **Shift + Clic derecho:** Abre el **Mapa de Vetas 2D** con zoom interactivo, orientación y marcadores de yacimientos.
+- **Shift + Clic derecho:** Abre el **Mapa de Vetas 2D** interactivo con orientación y marcadores.
 
 ![Mapa de vetas](docs/assets/vein_map.png)
 
-### 2. Extracción Minera (La Perforadora)
-- Fabrica la **Perforadora** (hierro, redstone, pico de hierro) y colócala en la superficie sobre el área de una veta descubierta.
+### 2. Extracción Automatizada (La Perforadora)
+- Fabrica la **Perforadora** y colócala en la superficie sobre el área de una veta descubierta.
 - Aliméntala con 80 FE/t (o conéctala a un Backbone energizado).
-- La perforadora extraerá mineral bruto (`raw_neoferrite` o `raw_crystalite`) conservando la **pureza exacta de la veta** y lo expulsará a contenedores o cables vecinos.
-- Puedes cambiar su prioridad energética (`Alta`, `Normal`, `Baja`) con **Shift + Clic derecho** sobre el bloque.
+- Abre su interfaz para instalar chips de firmware (como Turbo o Eco) y revisar su almacenamiento interno.
+- La perforadora extraerá mineral bruto conservando la **pureza de la veta** y expulsándolo a tolvas, tuberías o cables Backbone.
+- Cambia su prioridad eléctrica con **Shift + Clic derecho** sobre el bloque.
 
-### 3. Procesamiento y Duplicación (El Triturador)
-- Fabrica el **Triturador** y suminístrale 40 FE/t.
-- Cada mineral bruto se tritura en **2 polvos** preservando su nivel de pureza original.
+### 3. Procesamiento y Cadena de Pureza
+- **Triturador (40 FE/t):** Convierte 1 mineral en 2 polvos conservando su pureza.
+- **Lavadora (60 FE/t, 250 mB agua):** Sube la pureza del polvo en +1 y genera lodo (`sludge`). Con un chip de firmware **Selectivo**, puedes ordenar a las tolvas inferiores que solo extraigan el lodo.
+- **Centrífuga (80 FE/t):** Extrae escoria (`slag`) según la pureza inversa y procesa el lodo para obtener fragmentos de cristal (`crystal_shard`).
 
-### 4. Lavado y Enriquecimiento de Pureza (La Lavadora)
-- Fabrica la **Lavadora** (neoferrita, hierro, balde de agua, cristal de datos).
-- Conecta tuberías de agua o introduce cubos manualmente en su tanque interno (hasta 4 000 mB).
-- Introduce polvos de pureza 1 a 4: por cada ciclo (80 ticks @ 60 FE/t y 250 mB de agua), la lavadora **incrementa la pureza en +1** y expulsa **lodo (`sludge`)**.
-- Los polvos que alcanzan la pureza máxima (5) son rechazados automáticamente para no malgastar recursos.
+### 4. Refrigeración y Gestión Térmica
+- Las máquinas bajo carga continua acumulan calor. Si usas chips **Turbo** (1.5x velocidad), la generación de calor se triplica.
+- Coloca bloques **Disipadores (`heatsink`)** adyacentes a las caras de la máquina o haz fluir **agua** por sus lados para mantenerlas por debajo de 70 °C y evitar el estrangulamiento térmico.
 
-### 5. Centrifugado y Recuperación de Subproductos (La Centrífuga)
-- Fabrica la **Centrífuga** (hierro, neoferrita, cristal de datos, redstone) y suminístrale 80 FE/t.
-- **Polvos:** Procesa el polvo para recuperar el mismo polvo purificado y extraer **escoria (`slag`)** según la pureza inversa ($p=1 \to 80\%$, $p=5 \to 16\%$).
-- **Lodo:** Centrifuga el lodo para obtener valiosos **fragmentos de cristal (`crystal_shard`)** (25% de probabilidad).
-- Craftea bloques decorativos industriales de escoria (`slag_block`) con 4 escorias en la mesa de trabajo.
-
-### 6. Almacenamiento Inteligente Caliente/Frío y Telemetría
-- Conecta el **Núcleo (Core)**, cables **Backbone**, **Racks** calientes y **Racks Fríos (`cold_rack`)**.
-- Fabrica **Módulos de Datos Avanzados** (4x capacidad) y **Maestros** (16x capacidad) utilizando fragmentos de cristal y cristales de datos.
-- Accede al **Terminal**:
-  - **Pestaña Ítems:** Búsqueda instantánea, visualización de pureza por pila y extracción con pedidos en progreso para ítems en frío. Pulsa `Ctrl + Clic derecho` sobre un ítem para fijar su política (`AUTO`, `FIJAR_CALIENTE`, `SOLO_FRIO`).
-  - **Pestaña Estadísticas:** Telemetría de 60 minutos y estado de máquinas conectadas.
-  - **Pestaña Energía:** Monitor en tiempo real de flujo FE, gráfica histórica dual y control interactivo de prioridades.
-- Accede al **Núcleo**:
-  - **Pestaña Reglas:** Automatiza alarmas de redstone de 4 canales (`alarm`), avisos por chat o rebalanceos hacia el nivel frío con umbrales configurables e histéresis anti-parpadeo.
+### 5. Almacenamiento Inteligente, Papelera y Seguridad
+- Conecta el **Núcleo**, **Racks Calientes**, **Racks Fríos** y **Terminales**.
+- Equipa módulos avanzados (4x) y maestros (16x).
+- Si eliminas ítems por error, abre la pestaña **Papelera** en el Terminal para restaurarlos.
+- Configura reglas de automatización en el Núcleo:
+  - `Compactar`: convierte lingotes sobrantes en bloques de forma automática.
+  - `Descartar excedente`: elimina excesos hacia la papelera.
+  - `Alarma`: dispara señales de redstone de 4 canales.
+- En servidores multijugador, abre la pestaña **Acceso** en el Núcleo, cambia la red a modo **Privado** y autoriza a tus compañeros con permisos personalizados.
+- Usa la **Llave de Configuración (`config_key`)** con Shift + Clic derecho para copiar tus reglas y duplicarlas en otros núcleos o máquinas.
 
 ![Pantalla mural y visualización remota](docs/assets/wall_display.png)
 
@@ -131,55 +154,83 @@
 
 ## ⚙️ Configuración del Servidor
 Puedes personalizar todos los parámetros de balance en `saves/<tu_mundo>/serverconfig/logtech-server.toml`:
-- Capacidades de módulos básicos (4096), avanzados (x4) y maestros (x16).
-- Capacidad por módulo en racks fríos (`coldDataModuleCapacity = 16384`).
-- Búfer del Núcleo (`coreEnergyCapacity = 200000`) e intervalos de distribución.
-- Consumos de energía de todas las máquinas (Núcleo, Triturador, Lavadora, Centrífuga, Perforadora).
-- Ciclos de rebalanceo y retardo de extracción desde el frío (`coldRetrievalDelayTicks = 40`).
-- Número máximo de reglas en el Núcleo (`maxRules = 8`) y radio de avisos (`ruleNotificationRange = 64`).
+- Capacidades de módulos básicos, avanzados y maestros.
+- Racks fríos, búfer del Núcleo y reparto de energía.
+- Dinámica térmica: tasas de generación base, enfriamiento pasivo, disipadores y umbrales de seguridad.
+- Modificadores de chips de firmware (Eco, Turbo, Seguro).
+- Capacidades y tiempos de retención de Papelera y Cuarentena.
+- Límites de compactación por ciclo y lista negra de recetas.
+- Filtros, seguridad, registro de auditoría y ventana de agrupación temporal.
 
 ---
 
-## ⚠️ Problemas Conocidos y Compatibilidad
-- [x] Generación de energía nativa resuelta: incluye Generador de Carbón (`coal_generator`) para operar redes independientes.
+## ⚠️ Problemas Conocidos y Notas de Compatibilidad
+- [x] Generación de energía nativa: incluye Generador de Carbón (`coal_generator`) para operar redes independientes.
 - [ ] La reserva mostrada en los tooltips del mapa de vetas refleja una instantánea al momento de abrir la pantalla.
 - [ ] Las máquinas actúan como nodos hoja en la red (se conectan a Backbones pero no enrutan señales a bloques adyacentes por diseño).
+- **Protección Perimetral en Redes Privadas:** El modo Privado bloquea la rotura del Núcleo y restringe el acceso al Terminal, inserciones, extracciones y reglas. Los cables Backbone, Racks y Terminales no cuentan con protección contra rotura física individual; para servidores públicos se aconseja utilizar mods de reclamo de terreno.
 
 ---
 
 <a name="english"></a>
 # 🇬🇧 LogTech (English)
 
-**LogTech** is a factory automation and logistics technology mod for Minecraft 1.21.1 powered by NeoForge. Its core philosophy is empowering players to **monitor, measure, and optimize their production lines**. Featuring deterministic ore vein prospecting, purity refining pipelines, dual-tier hot/cold storage, automation rules, unified network power with load priorities, and 60-minute per-machine telemetry.
+**LogTech** is a factory automation and logistics technology mod for Minecraft 1.21.1 powered by NeoForge. Its core philosophy is empowering players to **monitor, measure, and optimize their production lines**. Featuring deterministic ore vein prospecting, purity refining pipelines, dual-tier hot/cold storage, thermal dissipation mechanics, machine firmware chips, advanced automation rules, multiplayer access control, and 60-minute per-machine telemetry.
 
 ![Storage network and Core](docs/assets/core_network.png)
 
-## ✨ What's New in v0.2.0 (Alpha Release)
+## ✨ What's New in v0.3.0 (Alpha Release)
 
-- **💎 Ore & Dust Purity System (1 to 5):** Raw ores extracted by the Drill inherit deterministic deposit purity (1 to 5). Purity is preserved through the Crusher and tracked as independent stacks in the digital network.
-- **🌊 Industrial Washer:** Machine with an internal 4,000 mB fluid tank. Consumes 250 mB water and 60 FE/t to upgrade dust purity ($p \to p+1$, up to 5) while generating `sludge`. Fully compatible with buckets and external fluid pipes.
-- **🔄 Byproduct Centrifuge:** Processes dusts at 80 FE/t, extracting `slag` with a probability inversely scaled to mineral purity ($80\% \times (6-p)/5$). Also spins `sludge` into valuable `crystal_shard` items (25% chance) with complete overflow buffer protection (`OUTPUT_FULL`).
-- **🔥 Coal Generator:** Burns solid fuel (coal, charcoal) generating 40 FE/t continuously, powering LogTech equipment out-of-the-box without requiring external tech mods.
-- **🧊 Hierarchical Hot and Cold Storage:**
-  - **Cold Rack (`cold_rack`):** Delivers **4x base storage capacity** per module (16,384 items default).
-  - **Progressive Retrieval:** Extracting cold items in the Terminal features an animated retrieval progress bar with countdown and atomic delivery preventing any duplication.
-  - **Dynamic Rebalancing & Pinning:** The Core monitors extraction usage scores with periodic decay, demoting cold-overflow items when hot tier exceeds 90%. Pin items using `Ctrl + Right Click` in the Terminal (`AUTO`, `FIJAR_CALIENTE`, `SOLO_FRIO`).
-  - **Advanced Storage Media:** Advanced Data Module (Tier 2, 4x) and Master Data Module (Tier 3, 16x).
-- **⚙️ Core Automation Rules & Redstone Alarm:**
-  - The Core features a **Rules tab** (up to 8 rules) supporting ghost slots, count/space conditions, anti-flicker hysteresis, and actions (`Move to cold`, `Chat alert`, `Redstone signal`).
-  - **Alarm (`alarm`):** Network block supporting 4 independent channels via right-click. Emits redstone signal strength 15 and illuminates when triggered.
-  - Notifications send sound and chat messages within 64 blocks with single-shot rearming.
-- **⚡ Network Power Grid & Machine Priorities:**
-  - Backbone cables accept external FE and channel power directly into the Core buffer (200,000 FE default).
-  - Proportional power distribution algorithm with strict energy conservation guarantees.
-  - Configurable machine priorities (`High`, `Normal`, `Low`) via GUI buttons or Shift + Right Click on the Drill, featuring load shedding (`SHED`) and stability hold timers.
-- **📊 Terminal Energy Panel:**
-  - Third interactive tab in the Terminal with energy capacity meter, real-time incoming/outgoing rates, 60-minute historical dual bar chart with net balance tooltips, branch segregation, and one-click priority toggles.
-- **🧩 Mod Integration (Soft Dependencies):**
-  - **Jade:** Real-time HUD showing status, causes, progress, FE energy, water, vein purity, and rack capacity.
-  - **JEI & EMI:** Recipe categories for Crushing, Washing, and Centrifuging with purity effects, water usage, and chance tooltips; machines registered as workstations.
+- **🔥 Thermal System & Active Dissipation:**
+  - **Heat Dynamics (0 to 100 °C):** Crusher, Washer, Centrifuge, and Mining Drill generate heat while operating. Under standard workloads they stabilize at ~50 °C.
+  - **Throttling & Shutdown:** Above 70 °C, machines enter thermal throttling (operating at 0.5x speed with 0.5x power draw). At 100 °C, they shut down safely (`OVERHEATED`) and will not resume until cooling to $\le 40$ °C.
+  - **Heatsink Block (`heatsink`):** Provides passive heat dissipation (+1.0 °C/s per adjacent block) and water immersion cooling (+0.5 °C/s per water face).
+  - Real-time heat gauge bar, cooling rate tooltips, and Jade HUD compatibility.
 
-![Terminal Energy Panel](docs/assets/energy_panel.png)
+![Machine heat and heatsink dissipation](docs/assets/machine_heat.png)
+
+- **💾 Machine Firmware Chips:**
+  - Dedicated firmware slot in Crusher, Washer, Centrifuge, and Mining Drill (which now features a dedicated GUI).
+  - **Eco Firmware:** 0.7x speed, 0.5x energy, 0.5x heat.
+  - **Turbo Firmware:** 1.5x speed, 2.0x energy, 3.0x heat (cooling heatsinks recommended!).
+  - **Safe Firmware:** Locked 1.0x speed without intermediate throttling; triggers early shutdown at 85 °C and resumes at $\le 30$ °C.
+  - **Selective Firmware:** Intelligent extraction filter for automated hoppers and fluid/item pipes in Washers and Centrifuges.
+
+- **🗑️ Storage Safety Net: Trash Bin & Quarantine:**
+  - **Trash Bin (`TrashBin`):** Dedicated "Papelera" tab in the Terminal to recover discarded items from the "Destruir" button or excess rules. Holds up to 4,096 items for 30 minutes (`gameTime`) with FIFO expiration and one-click restoration.
+  - **Quarantine Buffer (`QuarantineBuffer`):** 1,024-item emergency buffer in the Core that catches automated inputs when the network is full, unpowered, or overloaded, draining automatically back into the network once restored.
+  - **"Discard Excess" Rule Action (`DISCARD_EXCESS`):** Keeps inventory at exactly $N$, redirecting excess stock to the trash bin cleanly without oscillation.
+  - **"Quarantine Greater" Rule Condition (`QUARANTINE_GREATER`):** Monitors quarantine buffer levels to sound alarms or trigger automation.
+
+![Trash Tab in Storage Terminal](docs/assets/trash_tab.png)
+
+- **📦 Automated Resource Compaction (`COMPACT`):**
+  - Core automation rule action that scans dynamic recipes for reversible 3×3 or 2×2 symmetries (e.g. ingots $\leftrightarrow$ blocks).
+  - Atomically compacts excess items while preserving custom data components, mineral purity, and respecting configurable blacklists.
+
+- **🔍 Saved Views & Advanced Filters:**
+  - 8 quick-access slots [1..8] above the Terminal tabs. Save with Shift + Click and restore with a regular Click your search query, sort mode, storage tier filter (`All`, `Hot`, `Cold`), and minimum purity (0 to 5).
+  - Real-time bidirectional synchronization across all players using the Terminal.
+
+- **📈 Rate Tracking & Inventory Forecasts:**
+  - In-memory `RateTracker` tracking 5-minute rolling averages: item tooltips display net trends (`+120/min`, `−45/min`) and depletion countdowns.
+  - The Stats tab displays forecasted fill times for total network storage as well as hot and cold tiers.
+
+- **🔑 Configuration Key (`config_key`):**
+  - Tool to duplicate settings effortlessly: Shift + Right Click copies configuration (machine power priorities, alarm channels, Core rules and tier pinning) and Right Click pastes onto compatible blocks.
+
+- **🛡️ Access Permissions & Private Networks:**
+  - Core placer is registered as Network Owner.
+  - Toggle between **Open** (public access) and **Private** (restricted) security modes.
+  - **Access** tab in Core GUI to manage authorized players with granular permissions: View (`VIEW`), Extract (`EXTRACT`), Insert (`INSERT`), and Administer (`ADMIN`).
+  - Real-time instant revocation (closes open menus immediately) and Core breaking protection for non-admin players.
+
+![Core Access and Permissions Tab](docs/assets/access_tab.png)
+
+- **📜 Activity Audit Log:**
+  - 500-entry circular buffer tracking manual player actions (insertions, extractions, destructions, restorations, rule/access changes).
+  - 10-second temporal grouping preventing spam from repeated shift-clicks.
+  - Dedicated **Registro** (Log) tab in the Terminal for administrators with paginated browsing and player name search.
 
 ---
 
@@ -191,14 +242,14 @@ Puedes personalizar todos los parámetros de balance en `saves/<tu_mundo>/server
 
 ## 💾 Installation
 1. Install **Minecraft 1.21.1** with **NeoForge**.
-2. Download `logtech-0.2.0.jar` from [GitHub Releases](https://github.com/Chema280101/LogTech-Mod/releases), [Modrinth](https://modrinth.com), or [CurseForge](https://curseforge.com).
+2. Download `logtech-0.3.0.jar` from [GitHub Releases](https://github.com/Chema280101/LogTech-Mod/releases), [Modrinth](https://modrinth.com), or [CurseForge](https://curseforge.com).
 3. Place the `.jar` inside your `.minecraft/mods/` directory.
 4. *(Optional)* Add Jade or JEI to the `mods/` folder for in-game HUD and recipe viewing.
 5. Launch Minecraft.
 
 ---
 
-## 🚀 Progression Walkthrough (Purity Pipeline)
+## 🚀 Progression Walkthrough & Factory Guide
 
 ### 1. Underground Prospecting (The Scanner)
 - Craft the **Scanner** (iron, redstone, compass).
@@ -208,40 +259,54 @@ Puedes personalizar todos los parámetros de balance en `saves/<tu_mundo>/server
 ![Vein Map](docs/assets/vein_map.png)
 
 ### 2. Automated Mining (The Drill)
-- Craft the **Drill** and place it on the surface within the bounds of a discovered deposit.
+- Place the **Mining Drill** on the surface within the bounds of a discovered deposit.
 - Provide FE power (80 FE/t) or connect to an energized Backbone.
+- Open its GUI to install firmware chips (such as Turbo or Eco) and inspect internal storage.
 - The drill extracts raw ores carrying the **exact purity of the underlying deposit** and ejects into adjacent containers.
 - Cycle machine power priority (`High`, `Normal`, `Low`) with **Shift + Right-Click** on the Drill block.
 
-### 3. Duplication (The Crusher)
-- Supply 40 FE/t to the **Crusher**.
-- Raw ores are processed into **2 dusts**, retaining input purity.
+### 3. Refining Pipeline & Purity Upgrades
+- **Crusher (40 FE/t):** Converts 1 raw ore into 2 dusts while preserving mineral purity.
+- **Washer (60 FE/t, 250 mB water):** Increases dust purity by +1 and outputs sludge (`sludge`). With a **Selective** firmware chip, you can configure bottom hoppers to extract only the sludge.
+- **Centrifuge (80 FE/t):** Separates slag (`slag`) inversely proportional to purity and processes sludge into valuable crystal shards (`crystal_shard`).
 
-### 4. Purity Washing (The Washer)
-- Craft the **Washer** (neoferrite, iron, water bucket, data crystal).
-- Supply water via pipes or right-click with water buckets (4,000 mB tank).
-- Process dusts of purity 1 to 4: each cycle (80 ticks @ 60 FE/t and 250 mB water) **increases purity by +1** and outputs **sludge**.
-- Purity 5 dusts are rejected to avoid wasting water.
+### 4. Thermal Management & Dissipation
+- Machines operating continuously accumulate heat. Using **Turbo** chips increases speed by 50% but triples heat generation.
+- Place **Heatsink blocks (`heatsink`)** on adjacent faces or submerge sides in **water** to maintain operation below 70 °C and prevent thermal throttling.
 
-### 5. Byproduct Separation (The Centrifuge)
-- Supply 80 FE/t to the **Centrifuge**.
-- **Dusts:** Recovers the dust while separating **slag** based on inverse purity ($p=1 \to 80\%$, $p=5 \to 16\%$).
-- **Sludge:** Spin sludge to recover **crystal shards** (25% chance).
-- Craft decorative industrial **slag blocks** (`slag_block`) using 4 slags in a crafting table.
-
-### 6. Smart Storage & Automation
-- Connect the **Core**, **Backbone** cables, hot **Racks**, and **Cold Racks**.
-- Upgrade with **Advanced** (4x) and **Master** (16x) Data Modules.
-- In the **Terminal**:
-  - **Items Tab:** Search inventory, inspect purity levels, and retrieve items (with progress bar for cold items). Cycle item pinning with `Ctrl + Right Click` (`AUTO`, `FIJAR_CALIENTE`, `SOLO_FRIO`).
-  - **Stats Tab:** 60-minute activity history and machine list.
-  - **Energy Tab:** Real-time FE flow rates, 60-minute dual bar graph, and one-click priority toggles.
-- In the **Core**:
-  - **Rules Tab:** Configure up to 8 rules to trigger alarms, chat warnings, or cold-tier migrations with anti-flicker hysteresis.
+### 5. Smart Storage, Trash Safety & Access Security
+- Connect the **Core**, **Backbone** cables, **Hot Racks**, and **Cold Racks**.
+- Upgrade with Advanced (4x) and Master (16x) Data Modules.
+- In case of accidental deletion, open the Terminal's **Trash** tab to restore items.
+- Configure Core automation rules:
+  - `Compact`: automatically transforms excess ingots into storage blocks.
+  - `Discard Excess`: manages overflow safely into the trash bin.
+  - `Alarm`: triggers 4-channel redstone alarms.
+- On multiplayer servers, switch the Core to **Private** mode and assign custom roles to teammates in the **Access** tab.
+- Use the **Configuration Key (`config_key`)** with Shift + Right Click to copy your configuration and paste it onto identical machines across your factory.
 
 ![Factory Wall Display](docs/assets/wall_display.png)
 
 ---
 
+## ⚙️ Server Configuration
+Customize all balance parameters in `saves/<world>/serverconfig/logtech-server.toml`:
+- Module capacities and cold rack multipliers.
+- Thermal dynamics: base generation, passive dissipation, heatsinks, and overheat thresholds.
+- Firmware chip modifiers (Eco, Turbo, Safe).
+- Trash bin and quarantine capacities and retention lifetimes.
+- Compaction limits per cycle and recipe blacklists.
+- Rate tracking limits, security permissions, and audit log buffer parameters.
+
+---
+
+## ⚠️ Known Issues & Security Note
+- [x] Native power generation: includes Coal Generator (`coal_generator`) for standalone networks.
+- [ ] Deposit reserves in vein map tooltips reflect a snapshot at the time the UI is opened.
+- [ ] Machines act as leaf network nodes (connect to Backbones but do not relay signals to adjacent blocks by design).
+- **Perimeter Security on Private Networks:** Private mode protects the Core against unauthorized breaking and restricts Terminal access, item transfers, and rules. Peripheral cables, racks, and terminals are not individually protected against breaking in the world; pairing with land claim mods is recommended for public servers.
+
+---
+
 ## 📜 License
-LogTech is released under the **[MIT License](LICENSE)**. You are welcome to include it in modpacks and share your feedback!
+LogTech is released under the **[MIT License](LICENSE)**. All textures, models, and assets created for the mod are free and open source under the MIT License. You are welcome to include LogTech in modpacks and share your feedback!

@@ -4,6 +4,7 @@ import io.github.chema280101.logtech.LogTech;
 import io.github.chema280101.logtech.block.CoreMenu;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -13,7 +14,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Paquete enviado desde el servidor al cliente para sincronizar el estado completo del Núcleo y sus reglas.
+ * Paquete enviado desde el servidor al cliente para sincronizar el estado completo del Núcleo, sus reglas y accesos.
  */
 public record CoreSyncPayload(
         int containerId,
@@ -29,7 +30,13 @@ public record CoreSyncPayload(
         long coldStored,
         long coldCapacity,
         List<MachineInfo> machines,
-        List<RuleDto> rules
+        List<RuleDto> rules,
+        boolean canAdmin,
+        boolean isClaimable,
+        String ownerName,
+        int securityModeOrdinal,
+        List<AccessEntryDto> accessEntries,
+        List<OnlinePlayerDto> onlinePlayers
 ) implements CustomPacketPayload {
 
     public record MachineInfo(net.minecraft.network.chat.Component name, String statusKey, String causeKey) {}
@@ -42,6 +49,20 @@ public record CoreSyncPayload(
             int actionOrdinal,
             boolean enabled,
             boolean active
+    ) {}
+
+    public record AccessEntryDto(
+            UUID uuid,
+            String name,
+            boolean canView,
+            boolean canExtract,
+            boolean canInsert,
+            boolean canAdmin
+    ) {}
+
+    public record OnlinePlayerDto(
+            UUID uuid,
+            String name
     ) {}
 
     public static final Type<CoreSyncPayload> TYPE =
@@ -80,6 +101,30 @@ public record CoreSyncPayload(
                     buf.writeVarInt(r.actionOrdinal());
                     buf.writeBoolean(r.enabled());
                     buf.writeBoolean(r.active());
+                }
+
+                // Seguridad
+                buf.writeBoolean(payload.canAdmin());
+                buf.writeBoolean(payload.isClaimable());
+                buf.writeUtf(payload.ownerName());
+                buf.writeVarInt(payload.securityModeOrdinal());
+
+                // Entradas de acceso
+                buf.writeVarInt(payload.accessEntries().size());
+                for (AccessEntryDto a : payload.accessEntries()) {
+                    buf.writeUUID(a.uuid());
+                    buf.writeUtf(a.name());
+                    buf.writeBoolean(a.canView());
+                    buf.writeBoolean(a.canExtract());
+                    buf.writeBoolean(a.canInsert());
+                    buf.writeBoolean(a.canAdmin());
+                }
+
+                // Jugadores conectados
+                buf.writeVarInt(payload.onlinePlayers().size());
+                for (OnlinePlayerDto p : payload.onlinePlayers()) {
+                    buf.writeUUID(p.uuid());
+                    buf.writeUtf(p.name());
                 }
             },
             buf -> {
@@ -120,13 +165,42 @@ public record CoreSyncPayload(
                     ));
                 }
 
+                boolean canAdmin = buf.readBoolean();
+                boolean isClaimable = buf.readBoolean();
+                String ownerName = buf.readUtf();
+                int securityModeOrdinal = buf.readVarInt();
+
+                int accessSize = buf.readVarInt();
+                List<AccessEntryDto> accessEntries = new ArrayList<>(accessSize);
+                for (int i = 0; i < accessSize; i++) {
+                    accessEntries.add(new AccessEntryDto(
+                            buf.readUUID(),
+                            buf.readUtf(),
+                            buf.readBoolean(),
+                            buf.readBoolean(),
+                            buf.readBoolean(),
+                            buf.readBoolean()
+                    ));
+                }
+
+                int onlineSize = buf.readVarInt();
+                List<OnlinePlayerDto> onlinePlayers = new ArrayList<>(onlineSize);
+                for (int i = 0; i < onlineSize; i++) {
+                    onlinePlayers.add(new OnlinePlayerDto(
+                            buf.readUUID(),
+                            buf.readUtf()
+                    ));
+                }
+
                 return new CoreSyncPayload(
                         containerId, networkValid, blockCount,
                         energyStored, maxEnergyStored, energyConsumption,
                         totalStored, totalCapacity,
                         hotStored, hotCapacity,
                         coldStored, coldCapacity,
-                        machines, rules
+                        machines, rules,
+                        canAdmin, isClaimable, ownerName, securityModeOrdinal,
+                        accessEntries, onlinePlayers
                 );
             }
     );

@@ -11,7 +11,8 @@ public enum MachineStatus {
     NO_RESOURCE,
     NO_FLUID,
     IDLE,
-    SHED;
+    SHED,
+    OVERHEATED;
 
     public String getStatusKey() {
         return "gui.logtech.machine_status." + this.name().toLowerCase(Locale.ROOT);

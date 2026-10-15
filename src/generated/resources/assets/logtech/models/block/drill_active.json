@@ -1,6 +1,9 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/orientable_with_bottom",
   "textures": {
-    "all": "logtech:block/drill_active"
+    "bottom": "logtech:block/drill_bottom",
+    "front": "logtech:block/drill_side_active",
+    "side": "logtech:block/drill_side_active",
+    "top": "logtech:block/drill_top"
   }
 }

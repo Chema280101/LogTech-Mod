@@ -1,6 +1,9 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/orientable_with_bottom",
   "textures": {
-    "all": "logtech:block/centrifuge"
+    "bottom": "logtech:block/machine_bottom",
+    "front": "logtech:block/centrifuge_front",
+    "side": "logtech:block/machine_side",
+    "top": "logtech:block/machine_top"
   }
 }

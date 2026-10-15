@@ -1,6 +1,9 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/orientable_with_bottom",
   "textures": {
-    "all": "logtech:block/terminal"
+    "bottom": "logtech:block/machine_bottom",
+    "front": "logtech:block/terminal_front",
+    "side": "logtech:block/terminal_side",
+    "top": "logtech:block/terminal_top"
   }
 }

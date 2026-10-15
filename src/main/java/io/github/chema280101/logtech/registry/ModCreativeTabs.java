@@ -29,6 +29,7 @@ public class ModCreativeTabs {
                         output.accept(ModItems.CENTRIFUGE_ITEM.get());
                         output.accept(ModItems.WASHER_ITEM.get());
                         output.accept(ModItems.SLAG_BLOCK_ITEM.get());
+                        output.accept(ModItems.HEATSINK_ITEM.get());
                         output.accept(ModItems.DATA_MODULE.get());
                         output.accept(ModItems.DATA_MODULE_ADVANCED.get());
                         output.accept(ModItems.DATA_MODULE_MASTER.get());
@@ -42,6 +43,11 @@ public class ModCreativeTabs {
                         output.accept(ModItems.CRYSTAL_SHARD.get());
                         output.accept(ModItems.SLUDGE.get());
                         output.accept(ModItems.SCANNER.get());
+                        output.accept(ModItems.FIRMWARE_ECO.get());
+                        output.accept(ModItems.FIRMWARE_TURBO.get());
+                        output.accept(ModItems.FIRMWARE_SAFE.get());
+                        output.accept(ModItems.FIRMWARE_SELECTIVE.get());
+                        output.accept(ModItems.CONFIG_KEY.get());
                     })
                     .build());
 }
